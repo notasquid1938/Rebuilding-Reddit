@@ -3,7 +3,7 @@ import connectToDatabase from '../../db';
 export default async function handler(req, res) {
   try {
     const db = await connectToDatabase();
-    const collection = db.collection('RS_2005-06');
+    const collection = db.collection('RS_2005-12');
     const data = await collection.find({}).toArray();
 
     res.status(200).json(data);
