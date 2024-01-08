@@ -1,4 +1,6 @@
+// SearchBar.js
 import { useState } from 'react';
+import styles from '../styles/SearchBar.module.css'
 
 const SearchBar = () => {
   const [query, setQuery] = useState('');
@@ -14,26 +16,39 @@ const SearchBar = () => {
       return;
     }
 
-    // Make a request to the Suggestions API
     const response = await fetch(`/api/Suggestions?query=${inputValue}`);
     const data = await response.json();
 
     setSuggestions(data.suggestions);
   };
 
+  const handleSuggestionClick = (suggestion) => {
+    setQuery(suggestion);
+    setSuggestions([]);
+  };
+
   return (
-    <div>
-      <input
+    <div className={styles.inputContainer}>
+      <p>r/</p><input
         type="text"
         placeholder="Search for a subreddit..."
         value={query}
         onChange={handleInputChange}
       />
-      <ul>
-        {suggestions.map((suggestion, index) => (
-          <li key={index}>{suggestion}</li>
-        ))}
-      </ul>
+      {suggestions.length > 0 && (
+        <ul className={styles.inputSuggestions}>
+          {suggestions.map((suggestion, index) => (
+            <li key={index}>
+              <button
+                className={styles.suggestionButton}
+                onClick={() => handleSuggestionClick(suggestion)}
+              >
+                {suggestion}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };

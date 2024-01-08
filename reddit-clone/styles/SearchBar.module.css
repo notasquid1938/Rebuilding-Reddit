@@ -1,0 +1,29 @@
+.inputContainer {
+    position: relative;
+  }
+  
+  .inputSuggestions {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    border: 1px solid #ccc;
+    border-top: none;
+    z-index: 1;
+  }
+  
+  .suggestionButton {
+    width: 100%;
+    padding: 8px;
+    background-color: #fff;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+  }
+  
+  .suggestionButton:hover {
+    background-color: #f0f0f0;
+  }

@@ -17,7 +17,7 @@ async function getSuggestions(query) {
   const data = await loadSubreddits();
   const rankedSubreddits = rankSubreddits(query, data);
 
-  return rankedSubreddits.slice(0, 3);
+  return rankedSubreddits.slice(0, 5);
 }
 
 async function loadSubreddits() {
