@@ -38,7 +38,5 @@ async function loadSubreddits() {
 
 function rankSubreddits(query, subreddits) {
   const rankedSubreddits = fuzzysort.go(query.toLowerCase(), subreddits, { key: 0 });
-
-  // Convert the result to an array of subreddit names
   return rankedSubreddits.map(result => result.target);
 }
