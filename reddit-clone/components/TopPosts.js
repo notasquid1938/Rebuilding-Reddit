@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import styles from '../styles/HomePage.module.css' // Import the CSS module
+import styles from '../styles/TopPage.module.css' // Import the CSS module
 
 // ... (other imports)
 
-const HomePage = () => {
+const TopPosts = () => {
   const [posts, setPosts] = useState([]);
 
   useEffect(() => {
@@ -31,10 +31,11 @@ const HomePage = () => {
       <ul className={styles.postList}>
         {posts.map((post) => (
           <li key={post._id.$oid} className={styles.post}>
-            <p className={styles.postSubreddit}>r/{post.subreddit} • {formatDateTime(post.created_utc)}</p>
+            <p className={styles.postSubreddit}>{post.subreddit_name_prefixed} • {formatDateTime(post.created_utc)}</p>
             <p className={styles.postAuthor}>u/{post.author}</p>
             <h2 className={styles.postTitle}>{post.title}</h2>
-            <p className={styles.postUrl}>{post.url}</p>
+            <p className={styles.postBody}>{post.body}</p>
+            <p className={styles.postUrl}>URL: {post.url}</p>
             <p className={styles.postScore}>Score: {post.score}</p>
           </li>
         ))}
@@ -43,4 +44,5 @@ const HomePage = () => {
   );
 };
 
-export default HomePage;
+export default TopPosts;
+

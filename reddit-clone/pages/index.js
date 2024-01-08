@@ -1,17 +1,18 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
-import HomePage from '../components/HomePage';
-import styles from '../styles/index.module.css'
+import TopPosts from '../components/TopPosts';
+import SearchBar from '@/components/SearchBar';
 
-const IndexPage = () => {
+function HomePage () {
   return (
-    <div className={styles.container}>
+    <div>
       <Helmet>
         <title>Reddit - Dive into anything</title>
       </Helmet>
-      <HomePage />
+      <SearchBar />
+      <TopPosts />
     </div>
   );
 };
 
-export default IndexPage;
+export default HomePage;
