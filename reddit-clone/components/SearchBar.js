@@ -39,7 +39,7 @@ const SearchBar = () => {
       {suggestions.length > 0 && (
         <ul className={styles.inputSuggestions}>
           {suggestions.map((suggestion, index) => (
-            <li key={index}>
+            <li className={styles.suggestion} key={index}>
               <button
                 className={styles.suggestionButton}
                 onClick={() => handleSuggestionClick(suggestion)}

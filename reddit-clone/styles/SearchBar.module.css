@@ -1,17 +1,16 @@
 .inputContainer {
     position: relative;
     text-align-last: center;
+    text-align: -webkit-center;
   }
   
   .inputSuggestions {
     list-style: none;
     padding: 0;
     margin: 0;
-    position: absolute;
+    position: relative;
     top: 100%;
     left: 0;
-    width: 100%;
-    border: 1px solid #ccc;
     border-top: none;
     z-index: 1;
   }
@@ -19,13 +18,18 @@
   .suggestionButton {
     width: 100%;
     padding: 8px;
-    background-color: #fff;
-    color: black;
+    background-color: rgb(11,20,22);
+    color: rgb(236,244,245);
     border: none;
     text-align: left;
     cursor: pointer;
+    width: fit-content;
   }
   
   .suggestionButton:hover {
-    background-color: #f0f0f0;
+    background-color: #000000;
+  }
+
+  .suggestion {
+    width: auto;
   }
