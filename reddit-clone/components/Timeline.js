@@ -12,7 +12,9 @@ const Timeline = () => {
       fetch('/api/AvailableDates')
         .then(response => response.json())
         .then(data => {
-          setAvailableCollections(data.collections);
+          // Sort the collections in ascending order before setting the state
+          const sortedCollections = data.collections.sort();
+          setAvailableCollections(sortedCollections);
         })
         .catch(error => console.error('Error fetching available dates:', error));
     }

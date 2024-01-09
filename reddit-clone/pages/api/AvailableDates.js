@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     const collections = await db.listCollections().toArray();
     const rsCollections = collections
       .filter(collection => collection.name.startsWith('RS'))
-      .map(collection => collection.name);
+      .map(collection => collection.name.replace(/^RS_/, ''));
 
     res.status(200).json({ collections: rsCollections });
   } catch (error) {
