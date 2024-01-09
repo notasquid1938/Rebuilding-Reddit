@@ -10,7 +10,7 @@ const Submissions = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('/api/Posts');
+        const response = await axios.get('/api/Posts?startDate=2008-11&endDate=2008-12');
         setPosts(response.data);
       } catch (error) {
         console.error('Error fetching data:', error);

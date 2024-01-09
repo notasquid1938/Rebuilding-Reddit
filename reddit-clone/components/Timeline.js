@@ -1,17 +1,16 @@
-// Timeline.js
-
 import React, { useState, useEffect } from 'react';
 import styles from '../styles/Timeline.module.css';
 
 const Timeline = () => {
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [availableCollections, setAvailableCollections] = useState([]);
-  const [isDropdownOpened, setIsDropdownOpened] = useState(false);
+  const [isStartDropdownOpened, setIsStartDropdownOpened] = useState(false);
+  const [isEndDropdownOpened, setIsEndDropdownOpened] = useState(false);
 
   useEffect(() => {
     // Fetch available collections from the API when either dropdown is opened
-    if (isDropdownOpened) {
+    if (isStartDropdownOpened || isEndDropdownOpened) {
       fetch('/api/AvailableDates')
         .then(response => response.json())
         .then(data => {
@@ -21,15 +20,33 @@ const Timeline = () => {
         })
         .catch(error => console.error('Error fetching available dates:', error));
     }
-  }, [isDropdownOpened]);
+  }, [isStartDropdownOpened, isEndDropdownOpened]);
 
-  const handleDateChange = (event, type) => {
-    const selectedDate = event.target.value;
+  useEffect(() => {
+    // Make API request to Posts.js when startDate or endDate is selected
+    const fetchData = async () => {
+      if (startDate && endDate) {
+        try {
+          const response = await fetch(`/api/Posts?startDate=${startDate}&endDate=${endDate}`);
+          const data = await response.json();
+          // Handle the received data as needed, e.g., update state or perform other actions
+          console.log('Posts API response:', data);
+        } catch (error) {
+          console.error('Error fetching posts:', error);
+        }
+      }
+    };
 
+    fetchData();
+  }, [startDate, endDate]);
+
+  const handleDateChange = (selectedDate, type) => {
     if (type === 'start') {
       setStartDate(selectedDate);
+      setIsStartDropdownOpened(false);
     } else if (type === 'end') {
       setEndDate(selectedDate);
+      setIsEndDropdownOpened(false);
     }
   };
 
@@ -40,10 +57,10 @@ const Timeline = () => {
         <select
           id="start"
           className={styles.select}
-          onChange={(e) => handleDateChange(e, 'start')}
+          onChange={(e) => handleDateChange(e.target.value, 'start')}
           value={startDate}
-          onFocus={() => setIsDropdownOpened(true)}
-          onBlur={() => setIsDropdownOpened(false)}
+          onFocus={() => setIsStartDropdownOpened(true)}
+          onBlur={() => setIsStartDropdownOpened(false)}
         >
           <option value="">Select Start Date</option>
           {availableCollections.map((collection) => (
@@ -52,10 +69,10 @@ const Timeline = () => {
             </option>
           ))}
         </select>
-        {isDropdownOpened && (
+        {isStartDropdownOpened && (
           <div className={styles.dropdownList}>
             {availableCollections.map((collection) => (
-              <div key={collection} className={styles.option} onClick={() => setStartDate(collection)}>
+              <div key={collection} className={styles.option} onClick={() => handleDateChange(collection, 'start')}>
                 {collection}
               </div>
             ))}
@@ -68,10 +85,10 @@ const Timeline = () => {
         <select
           id="end"
           className={styles.select}
-          onChange={(e) => handleDateChange(e, 'end')}
+          onChange={(e) => handleDateChange(e.target.value, 'end')}
           value={endDate}
-          onFocus={() => setIsDropdownOpened(true)}
-          onBlur={() => setIsDropdownOpened(false)}
+          onFocus={() => setIsEndDropdownOpened(true)}
+          onBlur={() => setIsEndDropdownOpened(false)}
         >
           <option value="">Select End Date</option>
           {availableCollections.map((collection) => (
@@ -80,10 +97,10 @@ const Timeline = () => {
             </option>
           ))}
         </select>
-        {isDropdownOpened && (
+        {isEndDropdownOpened && (
           <div className={styles.dropdownList}>
             {availableCollections.map((collection) => (
-              <div key={collection} className={styles.option} onClick={() => setEndDate(collection)}>
+              <div key={collection} className={styles.option} onClick={() => handleDateChange(collection, 'end')}>
                 {collection}
               </div>
             ))}
@@ -94,7 +111,6 @@ const Timeline = () => {
       {startDate && endDate && (
         <div className={styles.selectedRange}>
           <p>Selected Range: {startDate} to {endDate}</p>
-          {/* Add your timeline rendering logic here */}
         </div>
       )}
     </div>
