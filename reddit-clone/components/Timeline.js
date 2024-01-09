@@ -1,35 +1,33 @@
+// Timeline.js
 import React, { useState, useEffect } from 'react';
 import styles from '../styles/Timeline.module.css';
 
-const Timeline = () => {
+const Timeline = ({ onDateRangeChange }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [availableCollections, setAvailableCollections] = useState([]);
   const [isStartDropdownOpened, setIsStartDropdownOpened] = useState(false);
   const [isEndDropdownOpened, setIsEndDropdownOpened] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
 
   useEffect(() => {
-    // Fetch available collections from the API when either dropdown is opened
-    if (isStartDropdownOpened || isEndDropdownOpened) {
+    if (isStartDropdownOpened || isEndDropdownOpened || formSubmitted) {
       fetch('/api/AvailableDates')
         .then(response => response.json())
         .then(data => {
-          // Sort the collections in ascending order before setting the state
           const sortedCollections = data.collections.sort();
           setAvailableCollections(sortedCollections);
         })
         .catch(error => console.error('Error fetching available dates:', error));
     }
-  }, [isStartDropdownOpened, isEndDropdownOpened]);
+  }, [isStartDropdownOpened, isEndDropdownOpened, formSubmitted]);
 
   useEffect(() => {
-    // Make API request to Posts.js when startDate or endDate is selected
     const fetchData = async () => {
-      if (startDate && endDate) {
+      if (startDate && endDate && formSubmitted) {
         try {
           const response = await fetch(`/api/Posts?startDate=${startDate}&endDate=${endDate}`);
           const data = await response.json();
-          // Handle the received data as needed, e.g., update state or perform other actions
           console.log('Posts API response:', data);
         } catch (error) {
           console.error('Error fetching posts:', error);
@@ -38,7 +36,7 @@ const Timeline = () => {
     };
 
     fetchData();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, formSubmitted]);
 
   const handleDateChange = (selectedDate, type) => {
     if (type === 'start') {
@@ -50,8 +48,14 @@ const Timeline = () => {
     }
   };
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onDateRangeChange(startDate, endDate);
+    setFormSubmitted(true);
+  };
+
   return (
-    <div className={styles.timelineContainer}>
+    <form className={styles.timelineContainer} onSubmit={handleSubmit}>
       <label className={styles.label} htmlFor="start">Start Date:</label>
       <div className={styles.selectContainer}>
         <select
@@ -113,7 +117,9 @@ const Timeline = () => {
           <p>Selected Range: {startDate} to {endDate}</p>
         </div>
       )}
-    </div>
+
+      <button type="submit">Submit</button>
+    </form>
   );
 };
 

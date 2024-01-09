@@ -4,13 +4,13 @@ import axios from 'axios';
 import Link from 'next/link'; 
 import styles from '../styles/Submissions.module.css';
 
-const Submissions = () => {
+const Submissions = ({ dateRange }) => {
   const [posts, setPosts] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get('/api/Posts?startDate=2008-11&endDate=2008-12');
+        const response = await axios.get(`/api/Posts?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
         setPosts(response.data);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -18,7 +18,7 @@ const Submissions = () => {
     };
 
     fetchData();
-  }, []);
+  }, [dateRange]);
 
   const formatDateTime = (timestamp) => {
     const date = new Date(timestamp * 1000);
