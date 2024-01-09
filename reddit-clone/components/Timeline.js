@@ -1,4 +1,7 @@
+// Timeline.js
+
 import React, { useState, useEffect } from 'react';
+import styles from '../styles/Timeline.module.css';
 
 const Timeline = () => {
   const [startDate, setStartDate] = useState(null);
@@ -31,41 +34,65 @@ const Timeline = () => {
   };
 
   return (
-    <div>
-      <label htmlFor="start">Start Date:</label>
-      <select
-        id="start"
-        onChange={(e) => handleDateChange(e, 'start')}
-        value={startDate}
-        onFocus={() => setIsDropdownOpened(true)}
-        onBlur={() => setIsDropdownOpened(false)}
-      >
-        <option value="">Select Start Date</option>
-        {availableCollections.map((collection) => (
-          <option key={collection} value={collection}>
-            {collection}
-          </option>
-        ))}
-      </select>
+    <div className={styles.timelineContainer}>
+      <label className={styles.label} htmlFor="start">Start Date:</label>
+      <div className={styles.selectContainer}>
+        <select
+          id="start"
+          className={styles.select}
+          onChange={(e) => handleDateChange(e, 'start')}
+          value={startDate}
+          onFocus={() => setIsDropdownOpened(true)}
+          onBlur={() => setIsDropdownOpened(false)}
+        >
+          <option value="">Select Start Date</option>
+          {availableCollections.map((collection) => (
+            <option key={collection} value={collection}>
+              {collection}
+            </option>
+          ))}
+        </select>
+        {isDropdownOpened && (
+          <div className={styles.dropdownList}>
+            {availableCollections.map((collection) => (
+              <div key={collection} className={styles.option} onClick={() => setStartDate(collection)}>
+                {collection}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      <label htmlFor="end">  End Date:</label>
-      <select
-        id="end"
-        onChange={(e) => handleDateChange(e, 'end')}
-        value={endDate}
-        onFocus={() => setIsDropdownOpened(true)}
-        onBlur={() => setIsDropdownOpened(false)}
-      >
-        <option value="">Select End Date</option>
-        {availableCollections.map((collection) => (
-          <option key={collection} value={collection}>
-            {collection}
-          </option>
-        ))}
-      </select>
+      <label className={styles.label} htmlFor="end">End Date:</label>
+      <div className={styles.selectContainer}>
+        <select
+          id="end"
+          className={styles.select}
+          onChange={(e) => handleDateChange(e, 'end')}
+          value={endDate}
+          onFocus={() => setIsDropdownOpened(true)}
+          onBlur={() => setIsDropdownOpened(false)}
+        >
+          <option value="">Select End Date</option>
+          {availableCollections.map((collection) => (
+            <option key={collection} value={collection}>
+              {collection}
+            </option>
+          ))}
+        </select>
+        {isDropdownOpened && (
+          <div className={styles.dropdownList}>
+            {availableCollections.map((collection) => (
+              <div key={collection} className={styles.option} onClick={() => setEndDate(collection)}>
+                {collection}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {startDate && endDate && (
-        <div>
+        <div className={styles.selectedRange}>
           <p>Selected Range: {startDate} to {endDate}</p>
           {/* Add your timeline rendering logic here */}
         </div>
