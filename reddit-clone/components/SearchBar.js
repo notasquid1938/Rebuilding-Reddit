@@ -1,6 +1,6 @@
 // SearchBar.js
 import { useState } from 'react';
-import styles from '../styles/SearchBar.module.css'
+import styles from '../styles/SearchBar.module.css';
 
 const SearchBar = () => {
   const [query, setQuery] = useState('');
@@ -16,7 +16,7 @@ const SearchBar = () => {
       return;
     }
 
-    const response = await fetch(`/api/Suggestions?query=${inputValue}`);
+    const response = await fetch(`/api/SearchSuggestions?query=${inputValue}`);
     const data = await response.json();
 
     setSuggestions(data.suggestions);
@@ -29,7 +29,8 @@ const SearchBar = () => {
 
   return (
     <div className={styles.inputContainer}>
-      <p>r/</p><input
+      <span className={styles.subredditPrefix}>r/</span>
+      <input
         type="text"
         placeholder="Search for a subreddit..."
         value={query}
