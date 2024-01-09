@@ -34,7 +34,8 @@ const PostDetail = () => {
           <>
             <p className={styles.postTitle}>{postData.title}</p>
             <p className={styles.postAuthor}>u/{postData.author}</p>
-            <p className={styles.postSubreddit}>{postData.subreddit_name_prefixed} • {formatDateTime(postData.created_utc)}</p>            <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
+            <p className={styles.postSubreddit}>{postData.subreddit_name_prefixed} • {formatDateTime(postData.created_utc)}</p>
+            <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
           </>
         ) : (
           <p>Loading...</p>

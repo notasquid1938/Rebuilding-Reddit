@@ -1,5 +1,6 @@
 .inputContainer {
     position: relative;
+    text-align-last: center;
   }
   
   .inputSuggestions {
@@ -19,6 +20,7 @@
     width: 100%;
     padding: 8px;
     background-color: #fff;
+    color: black;
     border: none;
     text-align: left;
     cursor: pointer;

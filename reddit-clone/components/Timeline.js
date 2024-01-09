@@ -48,7 +48,7 @@ const Timeline = () => {
         ))}
       </select>
 
-      <label htmlFor="end">End Date:</label>
+      <label htmlFor="end">  End Date:</label>
       <select
         id="end"
         onChange={(e) => handleDateChange(e, 'end')}
