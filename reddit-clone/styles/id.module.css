@@ -1,0 +1,25 @@
+.postContainer {
+    margin: 20px;
+    padding: 20px;
+    border: 1px solid #ccc;
+  }
+  
+  .postTitle {
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+  }
+  
+  .postLink {
+    color: #0070f3;
+    text-decoration: none;
+  }
+  
+  .postLink:hover {
+    text-decoration: underline;
+  }
+  
+  .postInfo {
+    margin-top: 10px;
+    color: #666;
+  }

@@ -22,17 +22,19 @@ const PostDetail = () => {
         fetchPostData();
       }
     }, [id]);
+
+    const formatDateTime = (timestamp) => {
+        const date = new Date(timestamp * 1000);
+        return date.toLocaleString();
+      };
   
     return (
-      <div>
-        <h1>Post</h1>
+        <div className={styles.postContainer}>
         {postData ? (
           <>
-            <p>Title: {postData.title}</p>
-            <p>Link: <a href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
-            <p>Author: {postData.author}</p>
-            <p>UTC Time: {new Date(postData.created_utc * 1000).toUTCString()}</p>
-            {/* Render other post details based on postData */}
+            <p className={styles.postTitle}>{postData.title}</p>
+            <p className={styles.postAuthor}>u/{postData.author}</p>
+            <p className={styles.postSubreddit}>{postData.subreddit_name_prefixed} • {formatDateTime(postData.created_utc)}</p>            <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
           </>
         ) : (
           <p>Loading...</p>
