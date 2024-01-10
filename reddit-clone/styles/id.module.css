@@ -43,3 +43,14 @@
   padding: 0;
   margin: 0;
 }
+
+.commentScoreContainer {
+  display: flex;
+  align-items: center;
+}
+
+.upvoteIcon,
+.downvoteIcon {
+  filter: invert(1);
+  margin-right: 5px; 
+}

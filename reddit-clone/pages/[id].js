@@ -2,6 +2,8 @@ import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import styles from '../styles/id.module.css';
 import ReactMarkdown from 'react-markdown';
+import UpvoteIcon from '../public/upvote.svg';
+import DownvoteIcon from '../public/downvote.svg';
 
 const PostDetail = () => {
   const router = useRouter();
@@ -59,15 +61,29 @@ const PostDetail = () => {
         <div className={styles.commentsContainer}>
           <h2>Comments</h2>
           <ul>
-            {commentsData.map((comment, index) => (
-              <li key={index} className={styles.comment}>
-                <p className={styles.commentAuthor}>u/{comment.author} • {formatDateTime(comment.created_utc)}</p>
-                <div className={styles.commentBody}>
-                  <ReactMarkdown>{comment.body}</ReactMarkdown>
-                </div>
+          {commentsData.map((comment, index) => (
+            <li key={index} className={styles.comment}>
+              <p className={styles.commentAuthor}>u/{comment.author} • {formatDateTime(comment.created_utc)}</p>
+              <div className={styles.commentBody}>
+                <ReactMarkdown>{comment.body}</ReactMarkdown>
+              </div>
+              <div className={styles.commentScoreContainer}>
+                <img
+                  src={UpvoteIcon.src}
+                  className={styles.upvoteIcon}
+                  height={UpvoteIcon.height}
+                  width={UpvoteIcon.width}
+                />
                 <p className={styles.commentScore}>Score: {comment.score}</p>
-              </li>
-            ))}
+                <img
+                  src={DownvoteIcon.src}
+                  className={styles.downvoteIcon}
+                  height={DownvoteIcon.height}
+                  width={DownvoteIcon.width}
+                />
+              </div>
+            </li>
+          ))}
           </ul>
 
           <div className={styles.pagination}>
