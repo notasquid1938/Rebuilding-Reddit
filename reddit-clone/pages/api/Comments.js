@@ -1,8 +1,10 @@
+// Comments.js
 import connectToDatabase from '../../db';
 
 export default async function handler(req, res) {
   try {
-    const { id } = req.query;
+    const { id, page = 1 } = req.query;
+    const commentsPerPage = 20;
 
     if (!id) {
       return res.status(400).json({ error: 'Missing post ID' });
@@ -17,7 +19,12 @@ export default async function handler(req, res) {
     for (const collectionInfo of collections) {
       if (collectionInfo.name.startsWith('RC')) {
         const collection = db.collection(collectionInfo.name);
-        const matchingComments = await collection.find({ link_id: `t3_${id}` }).toArray();
+        const matchingComments = await collection
+          .find({ link_id: `t3_${id}` })
+          .sort({ score: -1 }) // Sort comments by score in descending order
+          .skip((page - 1) * commentsPerPage)
+          .limit(commentsPerPage)
+          .toArray();
 
         if (matchingComments.length > 0) {
           comments.push(...matchingComments);
