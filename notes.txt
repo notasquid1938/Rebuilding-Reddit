@@ -4,3 +4,8 @@ getting Top 100 Submissions from 2005-06 to 2009-12
 
 unindexed: 31.86s, 20.75s, 20.14s
 indexing: 1.38s, 416ms, 433ms
+
+Getting every comment under a post
+
+unindexed: 50s, 54s, 51s
+indexed: 60ms, 70ms, 65ms
