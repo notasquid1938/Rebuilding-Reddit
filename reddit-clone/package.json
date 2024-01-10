@@ -18,6 +18,13 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet": "^6.1.0",
-    "react-router-dom": "^6.21.1"
+    "react-markdown": "^9.0.1",
+    "react-router-dom": "^6.21.1",
+    "rehype-raw": "^7.0.0",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.0",
+    "remark-react": "^9.0.1",
+    "snudown-js": "^4.0.1",
+    "sundown": "^2.0.1"
   }
 }

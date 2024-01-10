@@ -1,7 +1,7 @@
-// PostDetail.js
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
 import styles from '../styles/id.module.css';
+import ReactMarkdown from 'react-markdown';
 
 const PostDetail = () => {
   const router = useRouter();
@@ -62,7 +62,9 @@ const PostDetail = () => {
             {commentsData.map((comment, index) => (
               <li key={index} className={styles.comment}>
                 <p className={styles.commentAuthor}>u/{comment.author} • {formatDateTime(comment.created_utc)}</p>
-                <p className={styles.commentBody}>{comment.body}</p>
+                <div className={styles.commentBody}>
+                  <ReactMarkdown>{comment.body}</ReactMarkdown>
+                </div>
                 <p className={styles.commentScore}>Score: {comment.score}</p>
               </li>
             ))}
