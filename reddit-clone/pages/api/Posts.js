@@ -20,7 +20,10 @@ export default async function handler(req, res) {
     // Generate collection names between start and end dates
     const collectionNames = [];
     for (let year = parseInt(startYear); year <= parseInt(endYear); year++) {
-      for (let month = parseInt(startMonth); month <= parseInt(endMonth); month++) {
+      const startM = year === parseInt(startYear) ? parseInt(startMonth) : 1;
+      const endM = year === parseInt(endYear) ? parseInt(endMonth) : 12;
+    
+      for (let month = startM; month <= endM; month++) {
         const formattedMonth = month < 10 ? `0${month}` : `${month}`;
         collectionNames.push(`RS_${year}-${formattedMonth}`);
       }
