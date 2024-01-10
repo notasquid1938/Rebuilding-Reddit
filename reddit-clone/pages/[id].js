@@ -52,6 +52,21 @@ const PostDetail = () => {
           <p className={styles.postAuthor}>u/{postData.author}</p>
           <p className={styles.postTitle}>{postData.title}</p>
           <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
+          <div className={styles.commentScoreContainer}>
+              <img
+                src={UpvoteIcon.src}
+                className={styles.upvoteIcon}
+                height={UpvoteIcon.height}
+                width={UpvoteIcon.width}
+              />
+              <p className={styles.commentScore}>{postData.score}</p>
+              <img
+                src={DownvoteIcon.src}
+                className={styles.downvoteIcon}
+                height={DownvoteIcon.height}
+                width={DownvoteIcon.width}
+              />
+            </div>
         </>
       ) : (
         <p>Loading...</p>
