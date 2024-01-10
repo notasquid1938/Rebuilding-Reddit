@@ -1,4 +1,3 @@
-// Comments.js
 import connectToDatabase from '../../db';
 
 export default async function handler(req, res) {
@@ -22,7 +21,7 @@ export default async function handler(req, res) {
         const matchingComments = await collection
           .find({ link_id: `t3_${id}` })
           .sort({ score: -1 }) // Sort comments by score in descending order
-          .skip((page - 1) * commentsPerPage)
+          .skip((page - 1) * commentsPerPage + (page === 1 ? 0 : 1)) // Adjust skip logic for the first page
           .limit(commentsPerPage)
           .toArray();
 

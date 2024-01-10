@@ -68,7 +68,6 @@ const PostDetail = () => {
             ))}
           </ul>
 
-          {/* Pagination */}
           <div className={styles.pagination}>
             {currentPage > 1 && (
               <button onClick={() => handlePageChange(currentPage - 1)}>Previous</button>
