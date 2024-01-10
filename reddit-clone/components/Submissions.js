@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link'; 
 import styles from '../styles/Submissions.module.css';
+import UpvoteIcon from '../public/upvote.svg';
+import DownvoteIcon from '../public/downvote.svg';
 
 const Submissions = ({ dateRange }) => {
   const [posts, setPosts] = useState([]);
@@ -38,7 +40,21 @@ const Submissions = ({ dateRange }) => {
                 <h2 className={styles.postTitle}>{post.title}</h2>
                 <p className={styles.postBody}>{post.body}</p>
                 <p className={styles.postUrl}>URL: {post.url}</p>
-                <p className={styles.postScore}>Score: {post.score}</p>
+                <div className={styles.postScoreContainer}>
+                <img
+                  src={UpvoteIcon.src}
+                  className={styles.upvoteIcon}
+                  height={UpvoteIcon.height}
+                  width={UpvoteIcon.width}
+                />
+                <p className={styles.postScore}>{post.score}</p>
+                <img
+                  src={DownvoteIcon.src}
+                  className={styles.downvoteIcon}
+                  height={DownvoteIcon.height}
+                  width={DownvoteIcon.width}
+                />
+              </div>
               </div>
             </Link>
           </li>
