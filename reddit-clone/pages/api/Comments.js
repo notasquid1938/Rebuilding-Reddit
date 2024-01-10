@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     const db = await connectToDatabase();
     const collections = await db.listCollections().toArray();
 
-    const comments = [];
+    const allComments = [];
 
     // Iterate through RC collections and find comments with the specified link_id
     for (const collectionInfo of collections) {
@@ -20,16 +20,23 @@ export default async function handler(req, res) {
         const collection = db.collection(collectionInfo.name);
         const matchingComments = await collection
           .find({ link_id: `t3_${id}` })
-          .sort({ score: -1 }) // Sort comments by score in descending order
-          .skip((page - 1) * commentsPerPage + (page === 1 ? 0 : 1)) // Adjust skip logic for the first page
-          .limit(commentsPerPage)
           .toArray();
 
         if (matchingComments.length > 0) {
-          comments.push(...matchingComments);
+          allComments.push(...matchingComments);
         }
       }
     }
+
+    // Sort all comments by score in descending order
+    const sortedComments = allComments.sort((a, b) => b.score - a.score);
+
+    // Calculate the start and end index for the requested page
+    const startIndex = (page - 1) * commentsPerPage;
+    const endIndex = startIndex + commentsPerPage;
+
+    // Extract the comments for the requested page
+    const comments = sortedComments.slice(startIndex, endIndex);
 
     return res.status(200).json(comments);
   } catch (error) {
