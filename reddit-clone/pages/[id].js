@@ -10,7 +10,7 @@ const PostDetail = () => {
     useEffect(() => {
       const fetchPostData = async () => {
         try {
-          const response = await fetch(`/api/Comments?id=${id}`);
+          const response = await fetch(`/api/ID?id=${id}`);
           const data = await response.json();
           setPostData(data);
         } catch (error) {
