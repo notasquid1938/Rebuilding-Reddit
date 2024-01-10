@@ -52,5 +52,8 @@
 .upvoteIcon,
 .downvoteIcon {
   filter: invert(1);
-  margin-right: 5px; 
+}
+
+.commentScore{
+  margin: 5px;
 }

@@ -74,7 +74,7 @@ const PostDetail = () => {
                   height={UpvoteIcon.height}
                   width={UpvoteIcon.width}
                 />
-                <p className={styles.commentScore}>Score: {comment.score}</p>
+                <p className={styles.commentScore}>{comment.score}</p>
                 <img
                   src={DownvoteIcon.src}
                   className={styles.downvoteIcon}
