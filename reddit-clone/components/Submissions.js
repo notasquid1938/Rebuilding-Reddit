@@ -35,6 +35,11 @@ const Submissions = ({ dateRange }) => {
           <li key={post._id.$oid} className={styles.post}>
             <Link href={`/${post.id}`} passHref>
               <div>
+                <img
+                src={`/icons/${post.subreddit}.png`}
+                alt={`${post.subreddit} icon`}
+                className={styles.subredditImage}
+                />
                 <p className={styles.postSubreddit}>{post.subreddit_name_prefixed} • {formatDateTime(post.created_utc)}</p>
                 <p className={styles.postAuthor}>u/{post.author}</p>
                 <h2 className={styles.postTitle}>{post.title}</h2>
