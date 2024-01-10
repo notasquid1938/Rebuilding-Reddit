@@ -11,13 +11,11 @@ export default async function handler(req, res) {
 
     const db = await connectToDatabase();
     
-    // Extract year and month from start and end dates
     const startYear = startDate.split('-')[0];
     const endYear = endDate.split('-')[0];
     const startMonth = startDate.split('-')[1];
     const endMonth = endDate.split('-')[1];
 
-    // Generate collection names between start and end dates
     const collectionNames = [];
     for (let year = parseInt(startYear); year <= parseInt(endYear); year++) {
       const startM = year === parseInt(startYear) ? parseInt(startMonth) : 1;
