@@ -1,4 +1,4 @@
 /Data/reddit/comments/*.json
 /Data/reddit/submissions/*.json
 /subreddits(HUGE).txt
-/Data/reddit/*.parts
+/Data/*.parts
