@@ -50,7 +50,7 @@ const PostDetail = () => {
         <>
           <div className={styles.postInfo}>
             <img
-              src={`/icons/${postData.subreddit}.png`}
+              src={`/api/SubredditIcons?subreddit=${postData.subreddit}`}
               alt={`${postData.subreddit} icon`}
               className={styles.subredditImage}
             />
@@ -115,7 +115,6 @@ const PostDetail = () => {
               <button onClick={() => handlePageChange(currentPage - 1)}>Previous</button>
             )}
             <span>Page {currentPage}</span>
-            {/* You can add logic to determine whether there are more pages */}
             <button onClick={() => handlePageChange(currentPage + 1)}>Next</button>
           </div>
         </div>
