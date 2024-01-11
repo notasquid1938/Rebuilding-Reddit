@@ -36,7 +36,7 @@ const Submissions = ({ dateRange }) => {
             <Link href={`/${post.id}`} passHref>
               <div>
                 <img
-                src={`/icons/${post.subreddit}.png`}
+                src={`/api/SubredditIcons?subreddit=${post.subreddit}`}
                 alt={`${post.subreddit} icon`}
                 className={styles.subredditImage}
                 />
