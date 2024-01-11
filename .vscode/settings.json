@@ -11,7 +11,7 @@
         "reddit-clone/jsconfig.json": true,
         "reddit-clone/next.config.js": true,
         "reddit-clone/.gitignore": true,
-        "reddit-clone/package-lock.json": true,
+        "reddit-clone/package-lock.json": true
     },
     "hide-files.files": [
         "reddit-clone/.next",
