@@ -7,7 +7,6 @@ export default async (req, res) => {
   try {
     const iconsDir = path.join(process.cwd(), '../Data/reddit/icons/');
     const iconPath = path.join(iconsDir, `${subreddit}.png`);
-    console.log("Icon Path: ", iconPath)
 
     if (fs.existsSync(iconPath)) {
       const iconData = fs.readFileSync(iconPath);
