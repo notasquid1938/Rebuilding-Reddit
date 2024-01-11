@@ -7,6 +7,7 @@
   font-size: 24px;
   font-weight: bold;
   text-align: center;
+  align-items: center;
 }
 
 .postLink {
@@ -56,4 +57,20 @@
 
 .commentScore{
   margin: 5px;
+}
+
+.subredditImage {
+  height: 32px;
+  width: 32px;
+}
+
+.postInfo {
+  display: flex;
+  align-items: center;
+}
+
+.postSubreddit, .postAuthor {
+  margin-bottom: 0;
+  margin-top: 0;
+  margin-left: 10px;
 }

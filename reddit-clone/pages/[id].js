@@ -48,8 +48,17 @@ const PostDetail = () => {
     <div className={styles.postContainer}>
       {postData ? (
         <>
-          <p className={styles.postSubreddit}>{postData.subreddit_name_prefixed} • {formatDateTime(postData.created_utc)}</p>
-          <p className={styles.postAuthor}>u/{postData.author}</p>
+          <div className={styles.postInfo}>
+            <img
+              src={`/icons/${postData.subreddit}.png`}
+              alt={`${postData.subreddit} icon`}
+              className={styles.subredditImage}
+            />
+            <div className={styles.postInfoText}>
+              <p className={styles.postSubreddit}>{postData.subreddit_name_prefixed} • {formatDateTime(postData.created_utc)}</p>
+              <p className={styles.postAuthor}>{postData.author}</p>
+            </div>
+          </div>
           <p className={styles.postTitle}>{postData.title}</p>
           <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
           <div className={styles.commentScoreContainer}>
@@ -78,7 +87,7 @@ const PostDetail = () => {
           <ul>
           {commentsData.map((comment, index) => (
             <li key={index} className={styles.comment}>
-              <p className={styles.commentAuthor}>u/{comment.author} • {formatDateTime(comment.created_utc)}</p>
+              <p className={styles.commentAuthor}>{comment.author} • {formatDateTime(comment.created_utc)}</p>
               <div className={styles.commentBody}>
                 <ReactMarkdown>{comment.body}</ReactMarkdown>
               </div>

@@ -41,3 +41,8 @@
 .postScore{
   margin: 5px;
 }
+
+.subredditImage {
+  height: 32px;
+  width: 32px;
+}
