@@ -110,13 +110,6 @@ const Timeline = ({ onDateRangeChange }) => {
           </div>
         )}
       </div>
-
-      {startDate && endDate && (
-        <div className={styles.selectedRange}>
-          <p>Selected Range: {startDate} to {endDate}</p>
-        </div>
-      )}
-
       <button type="submit">Submit</button>
     </form>
   );
