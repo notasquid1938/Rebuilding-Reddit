@@ -28,7 +28,7 @@ const Search = ({ onDateRangeChange }) => {
     const fetchData = async () => {
       if (startDate && endDate && formSubmitted) {
         try {
-          const response = await fetch(`/api/Posts?startDate=${startDate}&endDate=${endDate}`);
+          const response = await fetch(`/api/Posts?startDate=${startDate}&endDate=${endDate}&subreddit=${subreddit}`);
           const data = await response.json();
           console.log('Posts API response:', data);
         } catch (error) {

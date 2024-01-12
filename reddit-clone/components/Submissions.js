@@ -1,4 +1,3 @@
-// Submissions.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import Link from 'next/link'; 
@@ -6,13 +5,13 @@ import styles from '../styles/Submissions.module.css';
 import UpvoteIcon from '../public/upvote.svg';
 import DownvoteIcon from '../public/downvote.svg';
 
-const Submissions = ({ dateRange }) => {
+const Submissions = ({ dateRange }, { subreddit }) => {
   const [posts, setPosts] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await axios.get(`/api/Posts?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+        const response = await axios.get(`/api/Posts?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&subreddit=${subreddit}`);
         setPosts(response.data);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -20,7 +19,7 @@ const Submissions = ({ dateRange }) => {
     };
 
     fetchData();
-  }, [dateRange]);
+  }, [dateRange], [subreddit]);
 
   const formatDateTime = (timestamp) => {
     const date = new Date(timestamp * 1000);
