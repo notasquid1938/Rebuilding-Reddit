@@ -19,13 +19,6 @@ const PostDetail = () => {
         const postResponse = await fetch(`/api/ID?id=${id}`);
         const postData = await postResponse.json();
         setPostData(postData);
-  
-        if (postData.url.includes('imgur.com')) {
-          const imgurId = postData.url.split('/').pop(); // Extract Imgur ID from the URL
-          const imgurResponse = await fetch(`/api/ImgurImages?id=${imgurId}`);
-          const imgurImageData = await imgurResponse.json();
-          setImgurImageData(imgurImageData);
-        }
       } catch (error) {
         console.error('Error fetching data:', error);
       }
@@ -74,7 +67,15 @@ const PostDetail = () => {
             </div>
           </div>
           <p className={styles.postTitle}>{postData.title}</p>
-          <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
+          {postData.url.includes('imgur.com') ? (
+            <img
+            src={`/api/ImgurImages?id=${postData.url.split('/').pop()}`}
+              alt="Imgur"
+              className={styles.imgurImage}
+            />
+          ) : (
+            <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
+          )}          
           <div className={styles.commentScoreContainer}>
               <img
                 src={UpvoteIcon.src}
