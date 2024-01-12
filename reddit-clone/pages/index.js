@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Helmet } from 'react-helmet';
-import SearchBar from '@/components/SearchBar';
-import Timeline from '@/components/Timeline';
 import Submissions from '../components/Submissions';
+import Search from '@/components/Search';
 
 function HomePage() {
   const [dateRange, setDateRange] = useState({ startDate: '0', endDate: '0' });
@@ -16,8 +15,7 @@ function HomePage() {
       <Helmet>
         <title>Reddit - Dive into anything</title>
       </Helmet>
-      <Timeline onDateRangeChange={handleDateRangeChange} />
-      <SearchBar />
+      <Search onDateRangeChange={handleDateRangeChange} />
       <Submissions dateRange={dateRange} />
     </div>
   );

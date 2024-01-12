@@ -34,3 +34,45 @@
   .suggestion {
     width: auto;
   }
+
+.timelineContainer {
+    display: flex;
+    flex-direction: column;
+    max-width: 400px;
+    margin: auto;
+  }
+  
+  .label {
+    margin-bottom: 8px;
+  }
+  
+  .selectContainer {
+    position: relative;
+    margin-bottom: 16px;
+  }
+  
+  .select {
+    width: 100%;
+    padding: 8px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .dropdownList {
+    height: 0;
+    width: 0;
+    overflow: hidden;
+  }
+  
+  .option {
+    padding: 8px;
+    cursor: pointer;
+  }
+  
+  .selectedRange {
+    margin-top: 16px;
+    font-size: 18px;
+  }
+  
