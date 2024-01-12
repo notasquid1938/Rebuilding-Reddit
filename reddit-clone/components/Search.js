@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import styles from '../styles/Search.module.css';
 
-const Search = ({ onDateRangeChange }) => {
+const Search = ({ onDateRangeChange }, {onSubredditChange}) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [subreddit, setSubreddit] = useState(''); 
   const [availableCollections, setAvailableCollections] = useState([]);
   const [isStartDropdownOpened, setIsStartDropdownOpened] = useState(false);
   const [isEndDropdownOpened, setIsEndDropdownOpened] = useState(false);
@@ -24,22 +25,6 @@ const Search = ({ onDateRangeChange }) => {
     }
   }, [isStartDropdownOpened, isEndDropdownOpened, formSubmitted]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (startDate && endDate && formSubmitted) {
-        try {
-          const response = await fetch(`/api/Posts?startDate=${startDate}&endDate=${endDate}&subreddit=${subreddit}`);
-          const data = await response.json();
-          console.log('Posts API response:', data);
-        } catch (error) {
-          console.error('Error fetching posts:', error);
-        }
-      }
-    };
-
-    fetchData();
-  }, [startDate, endDate, formSubmitted]);
-
   const handleDateChange = (selectedDate, type) => {
     if (type === 'start') {
       setStartDate(selectedDate);
@@ -53,10 +38,12 @@ const Search = ({ onDateRangeChange }) => {
   const handleInputChange = async (e) => {
     const inputValue = e.target.value;
     setQuery(inputValue);
+    setSubreddit(inputValue);
 
     // Check if the input has text before making the API request
     if (inputValue.trim() === '') {
       setSuggestions([]);
+      setSubreddit('all')
       return;
     }
 
@@ -74,6 +61,7 @@ const Search = ({ onDateRangeChange }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     onDateRangeChange(startDate, endDate);
+    onSubredditChange(subreddit);
     setFormSubmitted(true);
   };
 

@@ -11,8 +11,8 @@ function HomePage() {
     setDateRange({ startDate, endDate });
   };
 
-  const handleSubredditChange = (selectedSubreddit) => {
-    setSubreddit(selectedSubreddit);
+  const handleSubredditChange = (subreddit) => {
+    setSubreddit(subreddit);
   };
 
   return (
@@ -25,5 +25,3 @@ function HomePage() {
     </div>
   );
 }
-
-export default HomePage;
