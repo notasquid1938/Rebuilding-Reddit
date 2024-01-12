@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from '../styles/Search.module.css';
 
-const Search = ({ onDateRangeChange }, {onSubredditChange}) => {
+const Search = ({ onDateRangeChange, onSubredditChange}) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [subreddit, setSubreddit] = useState(''); 

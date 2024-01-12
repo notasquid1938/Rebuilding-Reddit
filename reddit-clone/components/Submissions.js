@@ -5,7 +5,7 @@ import styles from '../styles/Submissions.module.css';
 import UpvoteIcon from '../public/upvote.svg';
 import DownvoteIcon from '../public/downvote.svg';
 
-const Submissions = ({ dateRange, subreddit: { subreddit } }) => {
+const Submissions = ({ dateRange, subreddit }) => {
   const [posts, setPosts] = useState([]);
 
   useEffect(() => {
