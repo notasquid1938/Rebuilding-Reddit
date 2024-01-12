@@ -79,6 +79,30 @@ const Search = ({ onDateRangeChange }) => {
 
   return (
     <div className={styles.searchContainer}>
+      <div className={styles.inputContainer}>
+        <span className={styles.subredditPrefix}>r/</span>
+        <input
+          type="text"
+          placeholder="Search for a subreddit..."
+          value={query}
+          onChange={handleInputChange}
+        />
+        {suggestions.length > 0 && (
+          <ul className={styles.inputSuggestions}>
+            {suggestions.map((suggestion, index) => (
+              <li className={styles.suggestion} key={index}>
+                <button
+                  className={styles.suggestionButton}
+                  onClick={() => handleSuggestionClick(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      
       <form className={styles.formContainer} onSubmit={handleSubmit}>
         <label className={styles.label} htmlFor="start">Start Date:</label>
         <div className={styles.selectContainer}>
@@ -137,30 +161,6 @@ const Search = ({ onDateRangeChange }) => {
         </div>
         <button type="submit">Submit</button>
       </form>
-  
-      <div className={styles.inputContainer}>
-        <span className={styles.subredditPrefix}>r/</span>
-        <input
-          type="text"
-          placeholder="Search for a subreddit..."
-          value={query}
-          onChange={handleInputChange}
-        />
-        {suggestions.length > 0 && (
-          <ul className={styles.inputSuggestions}>
-            {suggestions.map((suggestion, index) => (
-              <li className={styles.suggestion} key={index}>
-                <button
-                  className={styles.suggestionButton}
-                  onClick={() => handleSuggestionClick(suggestion)}
-                >
-                  {suggestion}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
     </div>
   );  
 }
