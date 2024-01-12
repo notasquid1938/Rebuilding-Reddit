@@ -1,0 +1,23 @@
+Imgur Supports all these formats:
+
+Image Formats:
+
+JPEG
+PNG
+TIFF
+
+Weird:
+GIF
+APNG
+
+Video Formats:
+
+MP4
+MPEG
+AVI
+WEBM
+QuickTime
+x-matroska
+x-flv
+x-msvideo
+x-ms-wmv

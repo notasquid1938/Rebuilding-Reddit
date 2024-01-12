@@ -5,3 +5,7 @@
 /subreddits(HUGE).txt
 /Data/*.parts
 /Data/reddit/icons/*.png
+/Data/imgur/images/*jpeg
+/Data/imgur/images/*png
+/Data/imgur/images/*jpg
+/Data/imgur/images/*tiff
