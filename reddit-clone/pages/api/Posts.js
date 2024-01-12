@@ -4,6 +4,7 @@ export default async function handler(req, res) {
   try {
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
+    const subreddit = req.query.subreddit;
 
     if (!startDate || !endDate) {
       return res.status(400).json({ error: 'startDate and endDate are required query parameters' });
@@ -31,7 +32,14 @@ export default async function handler(req, res) {
     const topPosts = [];
     for (const collectionName of collectionNames) {
       const collection = db.collection(collectionName);
-      const data = await collection.find({}).sort({ score: -1 }).limit(100).toArray();
+      let findQuery = {};
+      
+      if (subreddit && subreddit.toLowerCase() !== 'all') {
+        // Add subreddit condition if provided and not 'all'
+        findQuery = { subreddit: subreddit.toLowerCase() };
+      }
+      
+      const data = await collection.find(findQuery).sort({ score: -1 }).limit(100).toArray();
       topPosts.push(...data);
     }
 
