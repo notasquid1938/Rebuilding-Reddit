@@ -4,7 +4,7 @@ import Submissions from '../components/Submissions';
 import Search from '@/components/Search';
 
 function HomePage() {
-  const [dateRange, setDateRange] = useState({ startDate: '0', endDate: '0' });
+  const [dateRange, setDateRange] = useState({ startDate: '2008-12', endDate: '2008-12' });
 
   const handleDateRangeChange = (startDate, endDate) => {
     setDateRange({ startDate, endDate });
