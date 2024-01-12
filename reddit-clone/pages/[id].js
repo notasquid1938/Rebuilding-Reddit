@@ -10,30 +10,44 @@ const PostDetail = () => {
   const { id } = router.query;
   const [postData, setPostData] = useState(null);
   const [commentsData, setCommentsData] = useState(null);
+  const [imgurImageData, setImgurImageData] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch post data
         const postResponse = await fetch(`/api/ID?id=${id}`);
         const postData = await postResponse.json();
         setPostData(postData);
   
-        // Fetch comments data with highest to lowest score order
-        const commentsResponse = await fetch(`/api/Comments?id=${id}&page=${currentPage}`);
-        const commentsData = await commentsResponse.json();
-        const sortedComments = commentsData.sort((a, b) => b.score - a.score); // Sort comments by score in descending order
-        setCommentsData(sortedComments);
+        if (postData.url.includes('imgur.com')) {
+          const imgurId = postData.url.split('/').pop(); // Extract Imgur ID from the URL
+          const imgurResponse = await fetch(`/api/ImgurImages?id=${imgurId}`);
+          const imgurImageData = await imgurResponse.json();
+          setImgurImageData(imgurImageData);
+        }
       } catch (error) {
         console.error('Error fetching data:', error);
       }
     };
   
+    const fetchComments = async () => {
+      try {
+        const commentsResponse = await fetch(`/api/Comments?id=${id}&page=${currentPage}`);
+        const commentsData = await commentsResponse.json();
+        const sortedComments = commentsData.sort((a, b) => b.score - a.score);
+        setCommentsData(sortedComments);
+      } catch (error) {
+        console.error('Error fetching comments:', error);
+      }
+    };
+  
     if (id) {
       fetchData();
+      fetchComments(); 
     }
-  }, [id, currentPage]);  
+  }, [id, currentPage]);
+  
 
   const formatDateTime = (timestamp) => {
     const date = new Date(timestamp * 1000);

@@ -2,10 +2,10 @@ import path from 'path';
 import fs from 'fs';
 
 export default async (req, res) => {
-  const { ImageID } = req.query;
+  const ImageID  = req.query.id;
 
   try {
-    const iconsDir = path.join(process.cwd(), '../Data/imgur/');
+    const iconsDir = path.join(process.cwd(), '../Data/imgur/images/');
     const supportedExtensions = ['png', 'jpeg', 'jpg', 'tiff'];
     
     let iconPath;
