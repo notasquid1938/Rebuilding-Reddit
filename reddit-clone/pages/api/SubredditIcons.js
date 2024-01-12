@@ -7,13 +7,16 @@ export default async (req, res) => {
   try {
     const iconsDir = path.join(process.cwd(), '../Data/reddit/icons/');
     const iconPath = path.join(iconsDir, `${subreddit}.png`);
+    const defaultIconPath = path.join(iconsDir, 'default.png');
 
     if (fs.existsSync(iconPath)) {
       const iconData = fs.readFileSync(iconPath);
       res.writeHead(200, { 'Content-Type': 'image/png' });
       res.end(iconData, 'binary');
     } else {
-      res.status(404).end('Icon not found');
+      const defaultIconData = fs.readFileSync(defaultIconPath);
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      res.end(defaultIconData, 'binary');
     }
   } catch (error) {
     console.error('Error fetching subreddit icon:', error);
