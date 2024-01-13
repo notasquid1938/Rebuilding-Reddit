@@ -3,7 +3,7 @@ import connectToDatabase from '../../db';
 export default async function handler(req, res) {
   try {
     const { id, page = 1 } = req.query;
-    const commentsPerPage = 20;
+    const commentsPerPage = 2;
 
     if (!id) {
       return res.status(400).json({ error: 'Missing post ID' });
@@ -24,6 +24,21 @@ export default async function handler(req, res) {
 
         if (matchingComments.length > 0) {
           allComments.push(...matchingComments);
+        }
+      }
+    }
+
+    // Fetch replies for each comment
+    for (const comment of allComments) {
+      comment.replies = []; // Initialize replies array for each comment
+      for (const collectionInfo of collections) {
+        if (collectionInfo.name.startsWith('RC')) {
+          const collection = db.collection(collectionInfo.name);
+          const replies = await collection
+            .find({ parent_id: `t1_${comment.id}` })
+            .toArray();
+    
+          comment.replies.push(...replies); // Append replies to the existing array
         }
       }
     }

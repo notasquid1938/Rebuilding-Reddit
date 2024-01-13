@@ -9,3 +9,154 @@ Getting every comment under a post
 
 unindexed: 50s, 54s, 51s
 indexed: 60ms, 70ms, 65ms
+
+Reddit Comment Structure:
+As you can see the database being used is just reddit comment data from pushift in a mongoDB. For example,
+
+this is the post:
+{
+  "_id": {
+    "$oid": "65a1c1d8a88776fd50d9a3bb"
+  },
+  "archived": true,
+  "author": "tcdoey",
+  "author_flair_background_color": null,
+  "author_flair_css_class": null,
+  "author_flair_richtext": [],
+  "author_flair_text": null,
+  "author_flair_text_color": null,
+  "author_flair_type": "text",
+  "brand_safe": true,
+  "can_gild": true,
+  "contest_mode": false,
+  "created_utc": 1229047376,
+  "distinguished": null,
+  "domain": "npr.org",
+  "edited": false,
+  "gilded": 0,
+  "hidden": false,
+  "hide_score": false,
+  "id": "7iyjn",
+  "is_crosspostable": false,
+  "is_reddit_media_domain": false,
+  "is_self": false,
+  "is_video": false,
+  "link_flair_css_class": null,
+  "link_flair_richtext": [],
+  "link_flair_text": null,
+  "link_flair_text_color": "dark",
+  "link_flair_type": "text",
+  "locked": false,
+  "media": null,
+  "media_embed": {},
+  "no_follow": false,
+  "num_comments": 573,
+  "num_crossposts": 0,
+  "over_18": false,
+  "parent_whitelist_status": "all_ads",
+  "permalink": "/r/reddit.com/comments/7iyjn/vote_up_if_you_would_rather_bail_out_npr_for_30/",
+  "retrieved_on": 1522767486,
+  "rte_mode": "markdown",
+  "score": 5396,
+  "secure_media": null,
+  "secure_media_embed": {},
+  "selftext": "",
+  "send_replies": true,
+  "spoiler": false,
+  "stickied": false,
+  "subreddit": "reddit.com",
+  "subreddit_id": "t5_6",
+  "subreddit_name_prefixed": "r/reddit.com",
+  "subreddit_type": "archived",
+  "suggested_sort": null,
+  "thumbnail": "default",
+  "thumbnail_height": null,
+  "thumbnail_width": null,
+  "title": "Vote up if you would RATHER bail out NPR for 30 lousy million than failing auto companies for 15 billion. ",
+  "url": "http://www.npr.org/templates/story/story.php?storyId=98098442&amp;ft=1&amp;f=1001",
+  "whitelist_status": "all_ads"
+}
+
+this is a comment underneath a post:
+{
+  "_id": {
+    "$oid": "65a1c64c773a63ce90fe1e5b"
+  },
+  "author": "inverse",
+  "distinguished": null,
+  "ups": 346,
+  "parent_id": "t3_7iyjn",
+  "link_id": "t3_7iyjn",
+  "author_flair_css_class": null,
+  "score": 346,
+  "id": "c06s7af",
+  "created_utc": "1229048236",
+  "subreddit_id": "t5_6",
+  "controversiality": 0,
+  "body": "how about bailing out NO ONE",
+  "score_hidden": false,
+  "edited": false,
+  "name": "t1_c06s7af",
+  "author_flair_text": null,
+  "subreddit": "reddit.com",
+  "downs": 0,
+  "retrieved_on": 1425908064,
+  "archived": true,
+  "gilded": 0
+}
+
+this is a reply to the comment above:
+{
+  "_id": {
+    "$oid": "65a1c64c773a63ce90fe23b8"
+  },
+  "downs": 0,
+  "retrieved_on": 1425908077,
+  "gilded": 0,
+  "archived": true,
+  "edited": true,
+  "score_hidden": false,
+  "body": "Actually this illustrates the benefits of a recession. Now that NPR has less funds, they are running more lean and efficient; cutting out the crap. News and Notes has been a HORRIBLE program. They should have axed it a long time ago. Now they have a perfect excuse.\r\n\r\n\r\nPS: if you wanna \"bail out\" NPR, why not go and do it yourself by donating? Either way, be it your decision or the gov't's, it's your money/taxdollars",
+  "author_flair_text": null,
+  "name": "t1_c06s8co",
+  "subreddit": "reddit.com",
+  "author_flair_css_class": null,
+  "score": 215,
+  "link_id": "t3_7iyjn",
+  "id": "c06s8co",
+  "created_utc": "1229052223",
+  "subreddit_id": "t5_6",
+  "controversiality": 0,
+  "author": "[deleted]",
+  "ups": 215,
+  "distinguished": null,
+  "parent_id": "t1_c06s7af"
+}
+
+This is a reply to that reply:
+{
+  "_id": {
+    "$oid": "65a1c64c773a63ce90fe2a21"
+  },
+  "author_flair_text": null,
+  "name": "t1_c06s9mg",
+  "subreddit": "reddit.com",
+  "edited": false,
+  "body": "&gt; Now that NPR has less funds\n\n\n\nDidn't NPR learn you nothin'?\n\nLess funding, or fewer funds.  Pick one.\n\n",
+  "score_hidden": false,
+  "archived": true,
+  "gilded": 0,
+  "downs": 0,
+  "retrieved_on": 1425908093,
+  "parent_id": "t1_c06s8co",
+  "author": "jamesbritt",
+  "distinguished": null,
+  "ups": 63,
+  "created_utc": "1229056477",
+  "subreddit_id": "t5_6",
+  "controversiality": 0,
+  "link_id": "t3_7iyjn",
+  "author_flair_css_class": null,
+  "score": 63,
+  "id": "c06s9mg"
+}
