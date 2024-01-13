@@ -11,7 +11,7 @@ const PostDetail = () => {
   const [postData, setPostData] = useState(null);
   const [commentsData, setCommentsData] = useState(null);
   const [imgurImageData, setImgurImageData] = useState(null);
-  const [commentCount, setCommentCount] = useState(null);
+  const [commentCount, setCommentCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
