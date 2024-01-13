@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       if (collectionInfo.name.startsWith('RC')) {
         const collection = db.collection(collectionInfo.name);
         const matchingComments = await collection
-          .find({ link_id: `t3_${id}` })
+          .find({ parent_id: `t3_${id}` })
           .toArray();
 
         if (matchingComments.length > 0) {

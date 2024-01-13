@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   const endLoad = new Date();
   const loadTime = endLoad - startLoad;
 
-  console.log(`Time taken for loading subreddits: ${loadTime}ms`);
+  //console.log(`Time taken for loading subreddits: ${loadTime}ms`);
 
   // Filter subreddits based on the query prefix
   const startFilter = new Date();
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   const endFilter = new Date();
   const filterTime = endFilter - startFilter;
 
-  console.log(`Time taken for filtering subreddits: ${filterTime}ms`);
+  //console.log(`Time taken for filtering subreddits: ${filterTime}ms`);
 
   // Perform fuzzy search and limit results to top 5
   const startFuzzySearch = new Date();
@@ -32,13 +32,13 @@ export default async function handler(req, res) {
   const endFuzzySearch = new Date();
   const fuzzySearchTime = endFuzzySearch - startFuzzySearch;
 
-  console.log(`Time taken for fuzzy search: ${fuzzySearchTime}ms`);
+  //console.log(`Time taken for fuzzy search: ${fuzzySearchTime}ms`);
 
   const suggestions = fuzzyResults.map(result => result.target);
 
   const endOverall = new Date();
   const totalTime = endOverall - startOverall;
-  console.log(`Total time taken: ${totalTime}ms`);
+  //console.log(`Total time taken: ${totalTime}ms`);
 
   res.status(200).json({ suggestions });
 }
