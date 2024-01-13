@@ -5,12 +5,47 @@ import ReactMarkdown from 'react-markdown';
 import UpvoteIcon from '../public/upvote.svg';
 import DownvoteIcon from '../public/downvote.svg';
 
+const formatDateTime = (timestamp) => {
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleString();
+};
+
+const Comment = ({ comment }) => (
+  <li className={styles.comment}>
+    <p className={styles.commentAuthor}>{comment.author} • {formatDateTime(comment.created_utc)}</p>
+    <div className={styles.commentBody}>
+      <ReactMarkdown>{comment.body}</ReactMarkdown>
+    </div>
+    <div className={styles.commentScoreContainer}>
+      <img
+        src={UpvoteIcon.src}
+        className={styles.upvoteIcon}
+        height={UpvoteIcon.height}
+        width={UpvoteIcon.width}
+      />
+      <p className={styles.commentScore}>{comment.score}</p>
+      <img
+        src={DownvoteIcon.src}
+        className={styles.downvoteIcon}
+        height={DownvoteIcon.height}
+        width={DownvoteIcon.width}
+      />
+    </div>
+    {comment.replies && comment.replies.length > 0 && (
+      <ul>
+        {comment.replies.map((reply, index) => (
+          <Comment key={index} comment={reply} />
+        ))}
+      </ul>
+    )}
+  </li>
+);
+
 const PostDetail = () => {
   const router = useRouter();
   const { id } = router.query;
   const [postData, setPostData] = useState(null);
   const [commentsData, setCommentsData] = useState(null);
-  const [imgurImageData, setImgurImageData] = useState(null);
   const [commentCount, setCommentCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -53,12 +88,6 @@ const PostDetail = () => {
       fetchComments(); 
     }
   }, [id, currentPage]);
-  
-
-  const formatDateTime = (timestamp) => {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString();
-  };
 
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
@@ -116,29 +145,9 @@ const PostDetail = () => {
         <div className={styles.commentsContainer}>
           <h2>Comments</h2>
           <ul>
-          {commentsData.map((comment, index) => (
-            <li key={index} className={styles.comment}>
-              <p className={styles.commentAuthor}>{comment.author} • {formatDateTime(comment.created_utc)}</p>
-              <div className={styles.commentBody}>
-                <ReactMarkdown>{comment.body}</ReactMarkdown>
-              </div>
-              <div className={styles.commentScoreContainer}>
-                <img
-                  src={UpvoteIcon.src}
-                  className={styles.upvoteIcon}
-                  height={UpvoteIcon.height}
-                  width={UpvoteIcon.width}
-                />
-                <p className={styles.commentScore}>{comment.score}</p>
-                <img
-                  src={DownvoteIcon.src}
-                  className={styles.downvoteIcon}
-                  height={DownvoteIcon.height}
-                  width={DownvoteIcon.width}
-                />
-              </div>
-            </li>
-          ))}
+            {commentsData.map((comment, index) => (
+              <Comment key={index} comment={comment} />
+            ))}
           </ul>
 
           <div className={styles.pagination}>
@@ -157,3 +166,4 @@ const PostDetail = () => {
 };
 
 export default PostDetail;
+
