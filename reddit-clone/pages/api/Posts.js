@@ -38,7 +38,11 @@ export default async function handler(req, res) {
         // Add subreddit condition if provided and not 'all'
         findQuery = { subreddit: subreddit.toLowerCase() };
       }
-      
+
+      // Log the query explanation
+      //const queryExplanation = await collection.find(findQuery).sort({ score: -1 }).limit(100).explain('executionStats');
+      //console.log(`Query Explanation for Collection ${collectionName}:`, queryExplanation);
+
       const data = await collection.find(findQuery).sort({ score: -1 }).limit(100).toArray();
       topPosts.push(...data);
     }
