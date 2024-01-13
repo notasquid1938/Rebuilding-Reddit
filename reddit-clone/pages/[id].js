@@ -11,6 +11,7 @@ const PostDetail = () => {
   const [postData, setPostData] = useState(null);
   const [commentsData, setCommentsData] = useState(null);
   const [imgurImageData, setImgurImageData] = useState(null);
+  const [commentCount, setCommentCount] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
@@ -23,6 +24,17 @@ const PostDetail = () => {
         console.error('Error fetching data:', error);
       }
     };
+
+    const fetchCommentCount = async () => {
+      try {
+        const commentCountResponse = await fetch(`/api/CommentCount?id=${id}`);
+        const commentCount = await commentCountResponse.json();
+        setCommentCount(commentCount)
+        console.log("Comment Count: ", commentCount)
+      } catch (error) {
+        console.error('Error fetching comments:', error);
+      }
+    }
   
     const fetchComments = async () => {
       try {
@@ -37,6 +49,7 @@ const PostDetail = () => {
   
     if (id) {
       fetchData();
+      fetchCommentCount();
       fetchComments(); 
     }
   }, [id, currentPage]);
@@ -75,7 +88,10 @@ const PostDetail = () => {
             />
           ) : (
             <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
-          )}          
+          )}      
+          <div className={styles.commentCount}>
+            <p>Total Comments: {commentCount.totalComments}</p>
+          </div>
           <div className={styles.commentScoreContainer}>
               <img
                 src={UpvoteIcon.src}

@@ -28,9 +28,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Log total comment count
-    console.log('Total comment count:', allComments.length);
-
     // Sort all comments by score in descending order
     const sortedComments = allComments.sort((a, b) => b.score - a.score);
 
