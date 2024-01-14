@@ -12,7 +12,7 @@ export default async function handler(req, res) {
 
   // Load subreddits from file
   const startLoad = new Date();
-  const fileContent = fs.readFileSync('subreddits(HUGE).txt', 'utf-8');
+  const fileContent = fs.readFileSync('subreddits.txt', 'utf-8');
   const endLoad = new Date();
   const loadTime = endLoad - startLoad;
 

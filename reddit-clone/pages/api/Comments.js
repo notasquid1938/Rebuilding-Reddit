@@ -3,7 +3,7 @@ import connectToDatabase from '../../db';
 export default async function handler(req, res) {
   try {
     const { id, page = 1 } = req.query;
-    const commentsPerPage = 2;
+    const commentsPerPage = 1;
 
     if (!id) {
       return res.status(400).json({ error: 'Missing post ID' });
