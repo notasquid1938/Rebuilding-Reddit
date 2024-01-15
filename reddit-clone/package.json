@@ -13,6 +13,7 @@
     "csv-parser": "^3.0.0",
     "fuzzysort": "^2.0.4",
     "jaro-winkler": "^0.2.8",
+    "meilisearch": "^0.36.0",
     "mongodb": "^6.3.0",
     "next": "^14.0.4",
     "react": "^18.2.0",

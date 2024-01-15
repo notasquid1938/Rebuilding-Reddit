@@ -6,7 +6,7 @@ index = client.index('subreddits')
 
 # Read subreddit names from the file
 file_path = 'subreddits.txt'
-batch_size = 1000
+batch_size = 10000
 documents = []
 
 with open(file_path, 'r') as file:
@@ -25,6 +25,15 @@ if documents:
 
 
 
+#import meilisearch
+
+#client = meilisearch.Client('http://127.0.0.1:7700')
 
 #client.delete_index('subreddits')
 # client = meilisearch.Client('http://127.0.0.1:7700', 'masterKey')
+'''
+docker run -it --rm ^
+  -p 7700:7700 ^
+  -v %cd%/meili_data:/meili_data ^
+  getmeili/meilisearch:v1.5
+'''
