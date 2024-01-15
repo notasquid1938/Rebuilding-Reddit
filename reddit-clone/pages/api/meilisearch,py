@@ -1,0 +1,30 @@
+import meilisearch
+
+client = meilisearch.Client('http://127.0.0.1:7700')
+
+index = client.index('subreddits')
+
+# Read subreddit names from the file
+file_path = 'subreddits.txt'
+batch_size = 1000
+documents = []
+
+with open(file_path, 'r') as file:
+    for i, subreddit_name in enumerate(file, start=1):
+        subreddit_name = subreddit_name.strip()
+        documents.append({'id': i, 'subreddit': subreddit_name})
+
+        # Add documents in batches
+        if i % batch_size == 0:
+            index.add_documents(documents)
+            documents = []
+
+# Add any remaining documents
+if documents:
+    index.add_documents(documents)
+
+
+
+
+#client.delete_index('subreddits')
+# client = meilisearch.Client('http://127.0.0.1:7700', 'masterKey')
