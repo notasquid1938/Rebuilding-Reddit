@@ -1,4 +1,4 @@
-import { MeiliSearch } from 'meilisearch'
+import { MeiliSearch } from 'meilisearch';
 
 export default async function handler(req, res) {
   const { query } = req.query;
@@ -10,12 +10,15 @@ export default async function handler(req, res) {
   const client = new MeiliSearch({
     host: 'http://127.0.0.1:7700'
     //apiKey: 'masterKey',
-  })
+  });
 
-  const index = client.index('subreddits')
+  const index = client.index('subreddits');
 
-  const suggestions = await index.search(query, { limit: 5 });
+  // Set the limit to 5 to get only the top 5 results
+  const searchResults = await index.search(query, { limit: 5 });
 
+  // Extract only the subreddit names from the search results
+  const subredditNames = searchResults.hits.map(result => result.subreddit);
 
-  res.status(200).json({ suggestions });
+  res.status(200).json({ suggestions: subredditNames });
 }
