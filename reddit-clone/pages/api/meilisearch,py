@@ -32,7 +32,7 @@ if documents:
 #client.delete_index('subreddits')
 # client = meilisearch.Client('http://127.0.0.1:7700', 'masterKey')
 '''
-docker run -it --rm ^
+docker run -it  ^
   -p 7700:7700 ^
   -v %cd%/meili_data:/meili_data ^
   getmeili/meilisearch:v1.5
