@@ -50,6 +50,7 @@ const Submissions = ({ dateRange, subreddit }) => {
                   className={styles.upvoteIcon}
                   height={UpvoteIcon.height}
                   width={UpvoteIcon.width}
+                  alt="Upvote Icon"
                 />
                 <p className={styles.postScore}>{post.score}</p>
                 <img
@@ -57,6 +58,7 @@ const Submissions = ({ dateRange, subreddit }) => {
                   className={styles.downvoteIcon}
                   height={DownvoteIcon.height}
                   width={DownvoteIcon.width}
+                  alt="Downvote Icon"
                 />
               </div>
               </div>

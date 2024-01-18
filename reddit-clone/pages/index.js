@@ -19,6 +19,8 @@ function HomePage() {
     <div>
       <Helmet>
         <title>Reddit - Dive into anything</title>
+        <lang>en</lang>
+        
       </Helmet>
       <Search onDateRangeChange={handleDateRangeChange} onSubredditChange={handleSubredditChange} />
       <Submissions dateRange={dateRange} subreddit={subreddit} />
