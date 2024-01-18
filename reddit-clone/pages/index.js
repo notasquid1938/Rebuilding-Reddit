@@ -17,10 +17,9 @@ function HomePage() {
 
   return (
     <div>
-      <Helmet>
+      <Helmet htmlAttributes={{ lang: 'en' }}>
         <title>Reddit - Dive into anything</title>
-        <lang>en</lang>
-        
+        <meta name="description" content="A website for archiving old Reddit Posts" />
       </Helmet>
       <Search onDateRangeChange={handleDateRangeChange} onSubredditChange={handleSubredditChange} />
       <Submissions dateRange={dateRange} subreddit={subreddit} />
