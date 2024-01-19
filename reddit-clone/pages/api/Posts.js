@@ -36,10 +36,10 @@ export default async function handler(req, res) {
       }
     }
 
-    // Define an array to store the top posts
-    const topPosts = [];
-    
-    // Loop through each collection and fetch top posts with pagination
+    // Define an array to store all posts
+    const allPosts = [];
+
+    // Loop through each collection and fetch all posts
     for (const collectionName of collectionNames) {
       const collection = db.collection(collectionName);
       let findQuery = {};
@@ -49,20 +49,23 @@ export default async function handler(req, res) {
         findQuery = { subreddit: subreddit.toLowerCase() };
       }
 
-      // Calculate skip and limit for pagination
-      const limit = 10; // You can adjust this as per your requirement
-      const skip = (page - 1) * limit;
-
-      // Fetch top posts with pagination
-      const data = await collection.find(findQuery).sort({ score: -1 }).skip(skip).limit(limit).toArray();
-      topPosts.push(...data);
+      // Fetch all posts from the current collection
+      const data = await collection.find(findQuery).toArray();
+      allPosts.push(...data);
     }
 
     // Sort all posts by 'score' in descending order
-    const sortedPosts = topPosts.sort((a, b) => b.score - a.score);
+    const sortedPosts = allPosts.sort((a, b) => b.score - a.score);
 
-    // Return the sorted posts as a JSON response
-    res.status(200).json(sortedPosts);
+    // Calculate skip and limit for pagination
+    const limit = 10; // You can adjust this as per your requirement
+    const skip = (page - 1) * limit;
+
+    // Get the posts for the current page
+    const paginatedPosts = sortedPosts.slice(skip, skip + limit);
+
+    // Return the paginated posts as a JSON response
+    res.status(200).json(paginatedPosts);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal Server Error' });
