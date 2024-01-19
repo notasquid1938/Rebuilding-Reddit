@@ -24,7 +24,7 @@ for filename in os.listdir(current_dir):
 
         # Read JSON file and insert data into MongoDB in batches of 10,000
         with open(os.path.join(current_dir, filename), 'r', encoding='utf-8') as file:
-            batch_size = 10000
+            batch_size = 100000
             json_data_list = []
             
             for line_number, line in enumerate(file, start=1):
