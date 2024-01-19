@@ -39,16 +39,12 @@ export default async function handler(req, res) {
         findQuery = { subreddit: subreddit.toLowerCase() };
       }
 
-      // Log the query explanation
-      //const queryExplanation = await collection.find(findQuery).sort({ score: -1 }).limit(100).explain('executionStats');
-      //console.log(`Query Explanation for Collection ${collectionName}:`, queryExplanation);
-
       const data = await collection.find(findQuery).sort({ score: -1 }).limit(100).toArray();
       topPosts.push(...data);
     }
 
     // Sort all posts by 'score' in descending order and limit to top 100
-    const sortedPosts = topPosts.sort((a, b) => b.score - a.score).slice(0, 100);
+    const sortedPosts = topPosts.sort((a, b) => b.score - a.score).slice(0, 10);
 
     res.status(200).json(sortedPosts);
   } catch (error) {
