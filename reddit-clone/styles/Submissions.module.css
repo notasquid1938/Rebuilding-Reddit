@@ -46,3 +46,7 @@
   height: 32px;
   width: 32px;
 }
+
+.postUrl {
+  word-break: break-all;
+}
