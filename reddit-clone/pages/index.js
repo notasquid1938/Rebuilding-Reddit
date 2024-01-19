@@ -20,7 +20,7 @@ function HomePage() {
       <Helmet htmlAttributes={{ lang: 'en' }}>
         <title>Reddit - Dive into anything</title>
         <meta name="description" content="A website for archiving old Reddit Posts" />
-        <link rel="icon" href="../favicon.ico"></link>
+        <link rel="icon" type="image/png" href="../favicon.png"></link>
       </Helmet>
       <Search onDateRangeChange={handleDateRangeChange} onSubredditChange={handleSubredditChange} />
       <Submissions dateRange={dateRange} subreddit={subreddit} />
