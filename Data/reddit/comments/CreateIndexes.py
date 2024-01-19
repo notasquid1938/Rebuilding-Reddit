@@ -23,15 +23,15 @@ for collection_name in collection_names:
             else:
                 print(f"Error creating index for 'parent_id' field in collection {collection_name}: {e}")
 
-        # Check if the index already exists for 'score' field
+                # Check if the index already exists for 'parent_id' field
         try:
-            collection.create_index([('score', -1)], name='score_index', unique=False)
-            print(f"Descending index created for 'score' field in collection: {collection_name}")
+            collection.create_index([('link_id', 1)], name='link_id_index', unique=False)
+            print(f"Ascending index created for 'link_id' field in collection: {collection_name}")
         except OperationFailure as e:
-            if "Index with name: score_index already exists" in str(e):
-                print(f"Descending index for 'score' field already exists in collection: {collection_name}")
+            if "Index with name: parent_id_index already exists" in str(e):
+                print(f"Ascending index for 'link_id' field already exists in collection: {collection_name}")
             else:
-                print(f"Error creating index for 'score' field in collection {collection_name}: {e}")
+                print(f"Error creating index for 'link_id' field in collection {collection_name}: {e}")
 
 # Close MongoDB connection
 client.close()
