@@ -1,3 +1,7 @@
+Command to start MongoDB:
+mongod --config "C:\Program Files\MongoDB\Server\7.0\bin\mongod.cfg"
+
+
 Indexing helps a lot with MongoDB Speed
 For instance,
 getting Top 100 Submissions from 2005-06 to 2009-12
