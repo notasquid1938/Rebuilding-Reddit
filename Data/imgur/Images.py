@@ -1,6 +1,6 @@
+# .gifv are just some metadata for .gifs this should get everything
+
 import warcio
-from PIL import Image
-from io import BytesIO
 from urllib.parse import urlparse, unquote
 
 def get_filename_from_url(url):
