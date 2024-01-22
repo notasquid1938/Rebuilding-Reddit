@@ -1,5 +1,4 @@
-# .gifv are just some metadata for .gifs this should get everything
-
+import os
 import warcio
 from urllib.parse import urlparse, unquote
 
@@ -22,7 +21,7 @@ def save_media_from_warc(warc_filename, output_directory):
 
                     # Get the filename from the URL
                     filename = get_filename_from_url(url)
-                    output_media_filename = f"{output_directory}/{filename}"
+                    output_media_filename = os.path.join(output_directory, filename)
 
                     # Save the media to a file
                     with open(output_media_filename, 'wb') as output_media_file:
@@ -31,7 +30,15 @@ def save_media_from_warc(warc_filename, output_directory):
                     print(f"Media saved from URL: {url} to {output_media_filename}")
 
 if __name__ == "__main__":
-    warc_filename = r"C:\Users\Ben-Shoemaker\Desktop\Coding\Rebuild-Reddit\Data\imgur\imgur_20240106055037_f1cea2ab.1683789516.megawarc.warc"
-    output_directory = "./Data/imgur/media"
+    input_directory = "./Data/imgur/"
+    output_base_directory = "./Data/imgur/"
 
-    save_media_from_warc(warc_filename, output_directory)
+    # Iterate through each .warc file in the input directory
+    for warc_filename in os.listdir(input_directory):
+        if warc_filename.endswith(".warc"):
+            # Create output directory for each WARC file
+            output_directory = os.path.join(output_base_directory, os.path.splitext(warc_filename)[0] + "-media")
+            os.makedirs(output_directory, exist_ok=True)
+
+            # Save media from WARC file to corresponding output directory
+            save_media_from_warc(os.path.join(input_directory, warc_filename), output_directory)
