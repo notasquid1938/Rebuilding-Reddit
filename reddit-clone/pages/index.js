@@ -21,6 +21,7 @@ function HomePage() {
         <title>Reddit - Dive into anything</title>
         <meta name="description" content="A website for archiving old Reddit Posts" />
         <link rel="icon" type="image/png" href="../favicon.png"></link>
+        <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
       </Helmet>
       <Search onDateRangeChange={handleDateRangeChange} onSubredditChange={handleSubredditChange} />
       <Submissions dateRange={dateRange} subreddit={subreddit} />

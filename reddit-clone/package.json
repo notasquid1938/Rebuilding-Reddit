@@ -11,11 +11,12 @@
   "dependencies": {
     "axios": "^1.6.5",
     "csv-parser": "^3.0.0",
+    "fs": "^0.0.1-security",
     "fuzzysort": "^2.0.4",
     "jaro-winkler": "^0.2.8",
     "meilisearch": "^0.36.0",
     "mongodb": "^6.3.0",
-    "next": "^14.0.4",
+    "next": "^14.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-helmet": "^6.1.0",
@@ -25,7 +26,9 @@
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.0",
     "remark-react": "^9.0.1",
+    "sitemap": "^7.1.1",
     "snudown-js": "^4.0.1",
-    "sundown": "^2.0.1"
+    "sundown": "^2.0.1",
+    "xmlbuilder2": "^3.1.1"
   }
 }
