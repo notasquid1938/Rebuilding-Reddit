@@ -22,15 +22,18 @@ function SiteMap() {
 
 export async function getServerSideProps({ res }) {
   try {
-    // Make an API call to gather the URLs for our site
-    const response = await axios.get('/api/Sitemap');
-    const posts = response.data;
+    //USE THIS FOR DEV
+    const response = await fetch("http://localhost:3000/api/Sitemap")
+    const posts = await response.json()
 
-    // Generate the XML sitemap with the posts data
+    //USE THIS FOR PRODUCTION
+    //const response = await axios.get('/api/Sitemap');
+    //const posts = response.data;
+
+
     const sitemap = generateSiteMap(posts);
 
     res.setHeader('Content-Type', 'text/xml');
-    // Send the XML to the browser
     res.write(sitemap);
     res.end();
 
