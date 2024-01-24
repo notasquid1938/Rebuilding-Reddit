@@ -1,4 +1,3 @@
-import os
 import warcio
 from urllib.parse import urlparse, unquote
 
@@ -21,24 +20,21 @@ def save_media_from_warc(warc_filename, output_directory):
 
                     # Get the filename from the URL
                     filename = get_filename_from_url(url)
-                    output_media_filename = os.path.join(output_directory, filename)
+                    output_media_filename = f"{output_directory}/{filename}"
 
-                    # Save the media to a file
-                    with open(output_media_filename, 'wb') as output_media_file:
-                        output_media_file.write(media_data)
+                    try:
+                        # Save the media to a file
+                        with open(output_media_filename, 'wb') as output_media_file:
+                            output_media_file.write(media_data)
 
-                    print(f"Media saved from URL: {url} to {output_media_filename}")
+                        print(f"Media saved from URL: {url} to {output_media_filename}")
+                    except Exception as e:
+                        # Log the issue in error.txt
+                        with open("error.txt", "a") as error_file:
+                            error_file.write(f"Error: {str(e)} - URL: {url}\n")
 
 if __name__ == "__main__":
-    input_directory = "./Data/imgur/"
-    output_base_directory = "./Data/imgur/"
+    warc_filename = r"C:\Users\Ben-Shoemaker\Desktop\Coding\Rebuild-Reddit\Data\imgur\imgur_20230509133254_768c86ff.1682559222.megawarc.warc"
+    output_directory = "./Data/imgur/media"
 
-    # Iterate through each .warc file in the input directory
-    for warc_filename in os.listdir(input_directory):
-        if warc_filename.endswith(".warc"):
-            # Create output directory for each WARC file
-            output_directory = os.path.join(output_base_directory, os.path.splitext(warc_filename)[0] + "-media")
-            os.makedirs(output_directory, exist_ok=True)
-
-            # Save media from WARC file to corresponding output directory
-            save_media_from_warc(os.path.join(input_directory, warc_filename), output_directory)
+    save_media_from_warc(warc_filename, output_directory)

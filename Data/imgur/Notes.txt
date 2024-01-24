@@ -1,5 +1,5 @@
 Decompression Command:
-py Decompress.py ./imgur_20240106055037_f1cea2ab.1683789516.megawarc.warc.zst > dict
+python3 Decompress.py ./imgur_20240106055037_f1cea2ab.1683789516.megawarc.warc.zst > dict
 
 
 Imgur Supports all these formats:
