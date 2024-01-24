@@ -34,7 +34,7 @@ def save_media_from_warc(warc_filename, output_directory):
                             error_file.write(f"Error: {str(e)} - URL: {url}\n")
 
 if __name__ == "__main__":
-    warc_filename = r"C:\Users\Ben-Shoemaker\Desktop\Coding\Rebuild-Reddit\Data\imgur\imgur_20230509133254_768c86ff.1682559222.megawarc.warc"
+    warc_filename = "./Rebuild-Reddit/Data/imgur/imgur_20230509133254_768c86ff.1682559222.megawarc.warc"
     output_directory = "./Data/imgur/media"
 
     save_media_from_warc(warc_filename, output_directory)
