@@ -2,6 +2,8 @@ import connectToDatabase from '@/db';
 
 export default async function handler(req, res) {
   try {
+    // Extract the batch count from the request query
+    const { batch } = req.query;
     // Connect to the MongoDB database
     const db = await connectToDatabase();
 
@@ -13,25 +15,26 @@ export default async function handler(req, res) {
       .filter((collection) => collection.name.startsWith('RS'))
       .map((collection) => collection.name);
 
-    // Calculate the total number of documents across all RS collections
-    let totalDocuments = 0;
-
-    for (const collectionName of rsCollections) {
-      const collectionDocuments = await db.collection(collectionName).estimatedDocumentCount();
-      //estimatedDocumentCount is instant and accurate within 50k (tested at 15 Million documents)
-      totalDocuments += collectionDocuments;
-    }
-
-    // Calculate batch count based on the total number of documents
-    const batchCount = Math.ceil(totalDocuments / 50000);
-
     // Prepare JSON response with batch ids
     const responseData = [];
 
-    for (let i = 1; i <= batchCount; i++) {
-      responseData.push({
-        id: i,
-      });
+    // Determine the starting index based on the batch count
+    const skipCount = (batch - 1) * 100;
+
+    // Loop through collections and fetch batch IDs
+    for (const collectionName of rsCollections) {
+      // Fetch documents from the collection with only the id field
+      const documents = await db.collection(collectionName)
+                                 .aggregate([
+                                    { $project: { id: '$_id' } }, // Project _id as id
+                                    { $skip: skipCount }, // Skip documents
+                                    { $limit: 100 } // Limit documents
+                                  ])
+                                 .toArray();
+      // Extract id fields from the documents
+      const batchIds = documents.map(doc => doc.id);
+      // Add batch IDs to the response data
+      responseData.push(...batchIds);
     }
 
     // Send JSON response

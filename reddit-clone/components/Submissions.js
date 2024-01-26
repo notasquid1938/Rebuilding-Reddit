@@ -32,7 +32,7 @@ const Submissions = ({ dateRange, subreddit }) => {
       <ul className={styles.postList}>
         {posts.map((post) => (
           <li key={post._id.$oid} className={styles.post}>
-            <Link href={`/${post.id}`} passHref>
+            <Link href={`/Thread/${post.id}`} passHref>
               <div>
                 <img
                 src={`/api/SubredditIcons?subreddit=${post.subreddit}`}

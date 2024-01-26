@@ -1,9 +1,9 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
-import styles from '../styles/id.module.css';
+import styles from '../../styles/id.module.css';
 import ReactMarkdown from 'react-markdown';
-import UpvoteIcon from '../public/upvote.svg';
-import DownvoteIcon from '../public/downvote.svg';
+import UpvoteIcon from '../../public/upvote.svg';
+import DownvoteIcon from '../../public/downvote.svg';
 
 const formatDateTime = (timestamp) => {
   const date = new Date(timestamp * 1000);
