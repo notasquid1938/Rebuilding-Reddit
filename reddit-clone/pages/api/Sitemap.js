@@ -26,7 +26,7 @@ export default async function handler(req, res) {
       // Fetch documents from the collection with only the id field
       const documents = await db.collection(collectionName)
                                  .aggregate([
-                                    { $project: { id: '$_id' } }, // Project _id as id
+                                    { $project: { id: '$id' } }, // Project _id as id
                                     { $skip: skipCount }, // Skip documents
                                     { $limit: 100 } // Limit documents
                                   ])
