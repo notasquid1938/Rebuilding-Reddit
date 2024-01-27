@@ -7,7 +7,7 @@ function generateSiteMap(posts) {
        .map(({ id }) => {
          return `
        <url>
-           <loc>${`https://redditrebuilt.com/Sitemap/${id}`}</loc>
+           <loc>${`https://redditrebuilt.com/Sitemap/${id}.xml`}</loc>
        </url>
      `;
        })
@@ -23,12 +23,12 @@ function SiteMap() {
 export async function getServerSideProps({ res }) {
   try {
     //USE THIS FOR DEV
-    const response = await fetch("http://localhost:3000/api/SitemapLinks")
-    const posts = await response.json()
+    //const response = await fetch("http://localhost:3000/api/SitemapLinks")
+    //const posts = await response.json()
 
     //USE THIS FOR PRODUCTION
-    //const response = await axios.get('/api/SitemapLinks');
-    //const posts = response.data;
+    const response = await axios.get('/api/SitemapLinks');
+    const posts = response.data;
 
 
     const sitemap = generateSiteMap(posts);
