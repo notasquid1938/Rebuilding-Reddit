@@ -7,7 +7,7 @@ function generateSiteMap(posts) {
          .map((id) => {
            return `
          <url>
-             <loc>${`https://redditrebuilt.com/${id}`}</loc>
+             <loc>${`https://redditrebuilt.com/Thread/${id}`}</loc>
          </url>
        `;
          })
