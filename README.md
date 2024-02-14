@@ -1,5 +1,5 @@
 ## Rebuilding Reddit
-https://redditrebuilt.com/ (Will probably be down, not hosted often)  
+https://redditrebuilt.com/ (Might be down, not hosted often)  
   
 This is a NextJS website that attempts to create as through as possible an archive of reddit. It accomplishes this by creating a convenient way to view all the content from Pushift's archives of Reddit's comments and submissions over the years.
 
