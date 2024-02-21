@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 
-const postgresURL = 'postgres://username:password@localhost:5432/Rebuild-Reddit';
+const postgresURL = 'postgres://Admin:Root@localhost:5432/Reddit-Rebuilt';
 
 let cachedPool = null;
 

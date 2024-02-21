@@ -1,14 +1,20 @@
-import connectToDatabase from "@/db-postgres";
+import connectToDatabase from "@/db";
 
 export default async function handler(req, res) {
   try {
     const db = await connectToDatabase();
     
-    // Fetch collection names starting with 'RS'
-    const collections = await db.listCollections().toArray();
-    const rsCollections = collections
-      .filter(collection => collection.name.startsWith('RS'))
-      .map(collection => collection.name.replace(/^RS_/, ''));
+    // Query to fetch table names starting with 'RS'
+    const query = `
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_catalog = 'Reddit-Rebuilt'
+      AND table_schema = 'public'
+      AND table_name LIKE 'RS%';
+    `;
+
+    const result = await db.query(query);
+    const rsCollections = result.rows.map(row => row.table_name.replace(/^RS_/, ''));
 
     res.status(200).json({ collections: rsCollections });
   } catch (error) {
