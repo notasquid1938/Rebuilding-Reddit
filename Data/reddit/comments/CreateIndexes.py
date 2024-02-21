@@ -1,37 +1,41 @@
-from pymongo import MongoClient
-from pymongo.errors import OperationFailure
+import psycopg2
+from psycopg2 import OperationalError
 
-# Connect to MongoDB
-client = MongoClient('mongodb://localhost:27017/')
-db = client['Rebuild-Reddit']
+def create_index(cursor, table_name, column_name, index_name, index_type):
+    try:
+        cursor.execute(f"CREATE INDEX {index_name} ON \"{table_name}\" (\"{column_name}\" {index_type});")
+        print(f"{index_type} index created for '{column_name}' column in table: {table_name}")
+    except OperationalError as e:
+        if "already exists" in str(e):
+            print(f"{index_type} index for '{column_name}' column already exists in table: {table_name}")
+        else:
+            print(f"Error creating index for '{column_name}' column in table {table_name}: {e}")
 
-# Get a list of collection names
-collection_names = db.list_collection_names()
+try:
+    connection = psycopg2.connect(
+        user="Admin",
+        password="Root",
+        host="localhost",
+        port="5432",
+        database="Reddit-Rebuilt"
+    )
+    cursor = connection.cursor()
 
-# Iterate through collections starting with 'RS'
-for collection_name in collection_names:
-    if collection_name.startswith('RC'):
-        collection = db[collection_name]
+    # Get a list of table names
+    cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+    table_names = cursor.fetchall()
 
-        # Check if the index already exists for 'parent_id' field
-        try:
-            collection.create_index([('parent_id', 1)], name='parent_id_index', unique=False)
-            print(f"Ascending index created for 'parent_id' field in collection: {collection_name}")
-        except OperationFailure as e:
-            if "Index with name: parent_id_index already exists" in str(e):
-                print(f"Ascending index for 'parent_id' field already exists in collection: {collection_name}")
-            else:
-                print(f"Error creating index for 'parent_id' field in collection {collection_name}: {e}")
+    # Iterate through tables starting with 'RC'
+    for table_name in table_names:
+        table_name = table_name[0]
+        if table_name.startswith('RC'):  # Adjust as per your naming convention
+            create_index(cursor, table_name, 'parent_id', f'"{table_name}_parent_id_index"', 'ASC')
+            create_index(cursor, table_name, 'link_id', f'"{table_name}_link_id_index"', 'ASC')
 
-                # Check if the index already exists for 'parent_id' field
-        try:
-            collection.create_index([('link_id', 1)], name='link_id_index', unique=False)
-            print(f"Ascending index created for 'link_id' field in collection: {collection_name}")
-        except OperationFailure as e:
-            if "Index with name: parent_id_index already exists" in str(e):
-                print(f"Ascending index for 'link_id' field already exists in collection: {collection_name}")
-            else:
-                print(f"Error creating index for 'link_id' field in collection {collection_name}: {e}")
-
-# Close MongoDB connection
-client.close()
+except OperationalError as e:
+    print(f"Error connecting to PostgreSQL: {e}")
+finally:
+    # Close PostgreSQL connection
+    if connection:
+        cursor.close()
+        connection.close()
