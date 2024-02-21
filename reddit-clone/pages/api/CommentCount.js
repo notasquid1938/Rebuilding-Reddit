@@ -1,4 +1,4 @@
-import connectToDatabase from '../../db-mongodb';
+import connectToDatabase from '@/db';
 
 export default async function handler(req, res) {
   try {
@@ -9,19 +9,28 @@ export default async function handler(req, res) {
     }
 
     const db = await connectToDatabase();
-    const collections = await db.listCollections().toArray();
-
+    
     let totalComments = 0;
 
-    // Iterate through RC collections and find comments with the specified link_id
-    for (const collectionInfo of collections) {
-      if (collectionInfo.name.startsWith('RC')) {
-        const collection = db.collection(collectionInfo.name);
-        const matchingCommentsCount = await collection
-          .countDocuments({ link_id: `t3_${id}` });
+    // Iterate through tables and find comments with the specified link_id
+    const client = await db.connect();
+    try {
+      const result = await client.query(
+        `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'RC%'`
+      );
 
-        totalComments += matchingCommentsCount;
+      const tables = result.rows.map(row => row.table_name);
+
+      for (const table of tables) {
+        const queryResult = await client.query(
+          `SELECT COUNT(*) FROM "${table}" WHERE link_id = 't3_${id}'`
+          // Double quotes around the table name to handle hyphen
+        );
+
+        totalComments += parseInt(queryResult.rows[0].count);
       }
+    } finally {
+      client.release();
     }
 
     return res.status(200).json({ totalComments });
