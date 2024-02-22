@@ -12,6 +12,7 @@ def create_index(cursor, table_name, column_name, index_name, index_type):
             print(f"Error creating index for '{column_name}' column in table {table_name}: {e}")
 
 try:
+    # Connect to the database and create cursor
     connection = psycopg2.connect(
         user="Admin",
         password="Root",
@@ -25,15 +26,20 @@ try:
     cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
     table_names = cursor.fetchall()
 
-    # Iterate through tables starting with 'RC'
+    # Iterate through tables and create indexes
     for table_name in table_names:
         table_name = table_name[0]
         if table_name.startswith('RC'):  # Adjust as per your naming convention
             create_index(cursor, table_name, 'parent_id', f'"{table_name}_parent_id_index"', 'ASC')
-            create_index(cursor, table_name, 'link_id', f'"{table_name}_link_id_index"', 'ASC')
+            create_index(cursor, table_name, 'link_id', f'"{table_name}_link_id_index"', 'DESC')
+
+    # Commit the transaction after all indexes are created
+    connection.commit()
+    print("Indexes Committed")
 
 except OperationalError as e:
     print(f"Error connecting to PostgreSQL: {e}")
+
 finally:
     # Close PostgreSQL connection
     if connection:
