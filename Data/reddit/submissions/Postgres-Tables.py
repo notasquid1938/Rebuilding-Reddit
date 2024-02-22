@@ -1,3 +1,6 @@
+##CMD To turn every file into JSON:
+##for %i in (*.) do ren "%i" "%i.json"
+
 import os
 import json
 import psycopg2
