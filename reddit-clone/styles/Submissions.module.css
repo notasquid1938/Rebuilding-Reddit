@@ -66,6 +66,7 @@
   cursor: pointer;
   border-radius: 5px;
   width: 25vh;
+  font-size: 2em;
 }
 
 .pagination button:hover {

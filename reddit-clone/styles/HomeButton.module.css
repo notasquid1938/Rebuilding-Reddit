@@ -1,0 +1,17 @@
+.button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--reddit-orange);
+    color: var(--text-color);
+    width: 20vw;
+    height: 5vh;
+    border-radius: 10px;
+    margin-left: 1vh;
+    margin-top: 1vh;
+    font-size: 1.5em; /* Adjust the font size as needed */
+}
+
+.button:hover {
+    background-color: var(--reddit-darker-orange);
+}
