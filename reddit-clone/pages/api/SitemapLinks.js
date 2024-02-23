@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     }
 
     // Calculate batch count based on the total number of documents
-    const batchSize = 50000;
+    const batchSize = 5000;
     const batchCount = Math.ceil(totalDocuments / batchSize);
 
     // Prepare JSON response with batch ids
