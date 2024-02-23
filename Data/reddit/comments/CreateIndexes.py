@@ -29,7 +29,7 @@ try:
     # Iterate through tables and create indexes
     for table_name in table_names:
         table_name = table_name[0]
-        if table_name.startswith('RC'):  # Adjust as per your naming convention
+        if table_name.startswith('rc'):  # Adjust as per your naming convention
             create_index(cursor, table_name, 'parent_id', f'"{table_name}_parent_id_index"', 'ASC')
             create_index(cursor, table_name, 'link_id', f'"{table_name}_link_id_index"', 'DESC')
 
