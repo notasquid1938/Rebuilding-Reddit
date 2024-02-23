@@ -8,6 +8,9 @@ export default async function handler(req, res) {
     const startDate = req.query.startDate;
     const endDate = req.query.endDate;
     const subreddit = req.query.subreddit;
+    const page = req.query.page || 1;
+    const pageSize = 10;
+    const offset = (page - 1) * pageSize;
 
     if (!startDate || !endDate) {
       return res.status(400).json({ error: 'startDate and endDate are required query parameters' });
@@ -42,12 +45,12 @@ export default async function handler(req, res) {
       }
     }
 
-    // Rank all posts from all tables collectively and limit to top 10
+    // Rank all posts from all tables collectively and limit to pageSize
     let query = `SELECT * FROM (${unionQuery}) AS all_posts`;
     if (subreddit && subreddit.toLowerCase() !== 'all') {
       query += ` WHERE subreddit = '${subreddit.toLowerCase()}'`;
     }
-    query += ` ORDER BY score DESC LIMIT 10`;
+    query += ` ORDER BY score DESC LIMIT ${pageSize} OFFSET ${offset}`;
 
     const { rows } = await db.query(query);
     res.status(200).json(rows);
