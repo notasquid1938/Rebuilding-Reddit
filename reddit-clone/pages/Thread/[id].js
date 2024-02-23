@@ -11,36 +11,47 @@ const formatDateTime = (timestamp) => {
   return date.toLocaleString();
 };
 
-const Comment = ({ comment }) => (
-  <li className={styles.comment}>
-    <p className={styles.commentAuthor}>{comment.author} • {formatDateTime(comment.created_utc)}</p>
-    <div className={styles.commentBody}>
-      <ReactMarkdown>{comment.body}</ReactMarkdown>
-    </div>
-    <div className={styles.commentScoreContainer}>
-      <img
-        src={UpvoteIcon.src}
-        className={styles.upvoteIcon}
-        height={UpvoteIcon.height}
-        width={UpvoteIcon.width}
-      />
-      <p className={styles.commentScore}>{comment.score}</p>
-      <img
-        src={DownvoteIcon.src}
-        className={styles.downvoteIcon}
-        height={DownvoteIcon.height}
-        width={DownvoteIcon.width}
-      />
-    </div>
-    {comment.replies && comment.replies.length > 0 && (
-      <ul>
-        {comment.replies.map((reply, index) => (
-          <Comment key={index} comment={reply} />
-        ))}
-      </ul>
-    )}
-  </li>
-);
+const Comment = ({ comment }) => {
+  const [showReplies, setShowReplies] = useState(false);
+
+  return (
+    <li className={styles.comment}>
+      <p className={styles.commentAuthor}>{comment.author} • {formatDateTime(comment.created_utc)}</p>
+      <div className={styles.commentBody}>
+        <ReactMarkdown>{comment.body}</ReactMarkdown>
+      </div>
+      <div className={styles.commentScoreContainer}>
+        <img
+          src={UpvoteIcon.src}
+          className={styles.upvoteIcon}
+          height={UpvoteIcon.height}
+          width={UpvoteIcon.width}
+        />
+        <p className={styles.commentScore}>{comment.score}</p>
+        <img
+          src={DownvoteIcon.src}
+          className={styles.downvoteIcon}
+          height={DownvoteIcon.height}
+          width={DownvoteIcon.width}
+        />
+      </div>
+      {comment.replies && comment.replies.length > 0 && (
+        <div>
+          <button onClick={() => setShowReplies(!showReplies)}>
+            {showReplies ? "Hide Replies" : "Show Replies"}
+          </button>
+          {showReplies && (
+            <ul>
+              {comment.replies.map((reply, index) => (
+                <Comment key={index} comment={reply} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </li>
+  );
+};
 
 const PostDetail = () => {
   const router = useRouter();
@@ -171,4 +182,3 @@ const PostDetail = () => {
 };
 
 export default PostDetail;
-
