@@ -61,11 +61,11 @@
   display: flex;
   background-color: var(--reddit-orange);
   color: var(--text-color);
-  border-radius: 3px;
   padding: 10px 20px;
   justify-content: space-evenly;
   cursor: pointer;
   border-radius: 5px;
+  width: 25vh;
 }
 
 .pagination button:hover {
@@ -78,5 +78,9 @@
 .postBody,
 .postUrl,
 .postScore {
+  color: var(--text-color);
+}
+
+.pageNumber {
   color: var(--text-color);
 }

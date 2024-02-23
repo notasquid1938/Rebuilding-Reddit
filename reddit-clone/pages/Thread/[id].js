@@ -112,6 +112,7 @@ const PostDetail = () => {
               </div>
             </div>
             <p className={styles.postTitle}>{postData.title}</p>
+            <p className={styles.postText}>{postData.selftext}</p>
             {postData.url.includes('imgur.com') ? (
               <img
               src={`/api/ImgurImages?id=${postData.url.split('/').pop()}`}

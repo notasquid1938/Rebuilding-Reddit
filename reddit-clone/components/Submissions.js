@@ -42,6 +42,11 @@ const Submissions = ({ dateRange, subreddit, onPageChange }) => {
   return (
     <div className={styles.container}>
       <h1 className={styles.heading}>Reddit Rebuilt</h1>
+      <div className={styles.pagination}>
+        <button onClick={handlePrevPage} disabled={currentPage === 1}>Previous Page</button>
+        <p className={styles.pageNumber}>Page {currentPage}</p>
+        <button onClick={handleNextPage}>Next Page</button>
+      </div>
       <ul className={styles.postList}>
         {posts.map((post) => (
           <li key={post.id} className={styles.post}>
@@ -59,22 +64,22 @@ const Submissions = ({ dateRange, subreddit, onPageChange }) => {
                   <p className={styles.postBody}>{post.body}</p>
                   <p className={styles.postUrl}>URL: {post.url}</p>
                   <div className={styles.postScoreContainer}>
-                </div>
-                  <img
-                    src={UpvoteIcon.src}
-                    className={styles.upvoteIcon}
-                    height={UpvoteIcon.height}
-                    width={UpvoteIcon.width}
-                    alt="Upvote Icon"
-                  />
-                  <p className={styles.postScore}>{post.score}</p>
-                  <img
-                    src={DownvoteIcon.src}
-                    className={styles.downvoteIcon}
-                    height={DownvoteIcon.height}
-                    width={DownvoteIcon.width}
-                    alt="Downvote Icon"
-                  />
+                    <img
+                      src={UpvoteIcon.src}
+                      className={styles.upvoteIcon}
+                      height={UpvoteIcon.height}
+                      width={UpvoteIcon.width}
+                      alt="Upvote Icon"
+                    />
+                    <p className={styles.postScore}>{post.score}</p>
+                    <img
+                      src={DownvoteIcon.src}
+                      className={styles.downvoteIcon}
+                      height={DownvoteIcon.height}
+                      width={DownvoteIcon.width}
+                      alt="Downvote Icon"
+                    />
+                  </div>
                 </div>
               </div>
             </Link>
@@ -83,6 +88,7 @@ const Submissions = ({ dateRange, subreddit, onPageChange }) => {
       </ul>
       <div className={styles.pagination}>
         <button onClick={handlePrevPage} disabled={currentPage === 1}>Previous Page</button>
+        <p className={styles.pageNumber}>Page {currentPage}</p>
         <button onClick={handleNextPage}>Next Page</button>
       </div>
     </div>
