@@ -29,7 +29,7 @@ try:
     # Iterate through tables and create indexes
     for table_name in table_names:
         table_name = table_name[0]
-        if table_name.startswith('RS'):  # Adjust as per your naming convention
+        if table_name.startswith('rs'):  # Adjust as per your naming convention
             create_index(cursor, table_name, 'score', f'"{table_name}_score_index"', 'DESC')
             create_index(cursor, table_name, 'id', f'"{table_name}_id_index"', 'ASC')
             create_index(cursor, table_name, 'subreddit', f'"{table_name}_subreddit_index"', 'ASC')

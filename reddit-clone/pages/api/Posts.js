@@ -1,4 +1,7 @@
-import connectToDatabase from '../../db-mongodb';
+import connectToDatabase from '../../db';
+
+// Define the columns to select from each table
+const selectedColumns = ['author', 'created_utc', 'score', 'id', 'subreddit', 'title', 'url'];
 
 export default async function handler(req, res) {
   try {
@@ -11,42 +14,43 @@ export default async function handler(req, res) {
     }
 
     const db = await connectToDatabase();
-    
-    const startYear = startDate.split('-')[0];
-    const endYear = endDate.split('-')[0];
-    const startMonth = startDate.split('-')[1];
-    const endMonth = endDate.split('-')[1];
 
-    const collectionNames = [];
-    for (let year = parseInt(startYear); year <= parseInt(endYear); year++) {
-      const startM = year === parseInt(startYear) ? parseInt(startMonth) : 1;
-      const endM = year === parseInt(endYear) ? parseInt(endMonth) : 12;
-    
+    const startYear = parseInt(startDate.split('-')[0]);
+    const startMonth = parseInt(startDate.split('-')[1]);
+    const endYear = parseInt(endDate.split('-')[0]);
+    const endMonth = parseInt(endDate.split('-')[1]);
+
+    const tableNames = [];
+    for (let year = startYear; year <= endYear; year++) {
+      const startM = (year === startYear) ? startMonth : 1;
+      const endM = (year === endYear) ? endMonth : 12;
+
       for (let month = startM; month <= endM; month++) {
         const formattedMonth = month < 10 ? `0${month}` : `${month}`;
-        collectionNames.push(`RS_${year}-${formattedMonth}`);
+        tableNames.push(`RS_${year}_${formattedMonth}`);
       }
     }
 
-    // Fetch top 100 posts from each collection
-    const topPosts = [];
-    for (const collectionName of collectionNames) {
-      const collection = db.collection(collectionName);
-      let findQuery = {};
-      
-      if (subreddit && subreddit.toLowerCase() !== 'all') {
-        // Add subreddit condition if provided and not 'all'
-        findQuery = { subreddit: subreddit.toLowerCase() };
+    // Construct the UNION ALL query to fetch data from all tables
+    let unionQuery = '';
+    for (let i = 0; i < tableNames.length; i++) {
+      // Construct the SELECT statement with selected columns
+      const columnsToSelect = selectedColumns.map(col => `${col}`);
+      unionQuery += `SELECT ${columnsToSelect.join(',')} FROM ${tableNames[i]}`;
+      if (i !== tableNames.length - 1) {
+        unionQuery += ' UNION ALL ';
       }
-
-      const data = await collection.find(findQuery).sort({ score: -1 }).limit(10).toArray();
-      topPosts.push(...data);
     }
 
-    // Sort all posts by 'score' in descending order and limit to top 100
-    const sortedPosts = topPosts.sort((a, b) => b.score - a.score).slice(0, 10);
+    // Rank all posts from all tables collectively and limit to top 10
+    let query = `SELECT * FROM (${unionQuery}) AS all_posts`;
+    if (subreddit && subreddit.toLowerCase() !== 'all') {
+      query += ` WHERE subreddit = '${subreddit.toLowerCase()}'`;
+    }
+    query += ` ORDER BY score DESC LIMIT 10`;
 
-    res.status(200).json(sortedPosts);
+    const { rows } = await db.query(query);
+    res.status(200).json(rows);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal Server Error' });

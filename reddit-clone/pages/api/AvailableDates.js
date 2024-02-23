@@ -10,11 +10,11 @@ export default async function handler(req, res) {
       FROM information_schema.tables
       WHERE table_catalog = 'Reddit-Rebuilt'
       AND table_schema = 'public'
-      AND table_name LIKE 'RS%';
+      AND table_name LIKE 'rs%';
     `;
 
     const result = await db.query(query);
-    const rsCollections = result.rows.map(row => row.table_name.replace(/^RS_/, ''));
+    const rsCollections = result.rows.map(row => row.table_name.replace(/^rs_/, '').replace(/_/g, '-'));
 
     res.status(200).json({ collections: rsCollections });
   } catch (error) {

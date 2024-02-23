@@ -1,6 +1,3 @@
-##CMD To turn every file into JSON:
-##for %i in (*.) do ren "%i" "%i.json"
-
 import os
 import json
 import psycopg2
@@ -38,7 +35,8 @@ def insert_batch(table_name, columns, batch_data):
 # Loop through each JSON file in the current directory
 for filename in os.listdir(current_dir):
     if filename.endswith('.json'):
-        table_name = os.path.splitext(filename)[0]
+        # Replace hyphens with underscores and make lowercase in the table name
+        table_name = os.path.splitext(filename)[0].replace('-', '_').lower()
 
         # Check if the table already exists
         cursor.execute(

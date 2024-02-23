@@ -31,7 +31,7 @@ const Submissions = ({ dateRange, subreddit }) => {
       <h1 className={styles.heading}>Reddit Rebuilt</h1>
       <ul className={styles.postList}>
         {posts.map((post) => (
-          <li key={post._id.$oid} className={styles.post}>
+          <li key={post.id} className={styles.post}>
             <Link href={`/Thread/${post.id}`} passHref>
               <div>
                 <img
