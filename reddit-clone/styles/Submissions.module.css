@@ -38,7 +38,7 @@
   filter: invert(1);
 }
 
-.postScore{
+.postScore {
   margin: 5px;
 }
 
@@ -49,4 +49,29 @@
 
 .postUrl {
   word-break: break-all;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.pagination button {
+  background-color: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  margin: 0 5px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+.pagination button:hover {
+  background-color: #0056b3;
+}
+
+.pagination button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
