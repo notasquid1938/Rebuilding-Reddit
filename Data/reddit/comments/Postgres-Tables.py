@@ -38,8 +38,8 @@ def insert_batch(table_name, columns, batch_data):
 # Loop through each JSON file in the current directory
 for filename in os.listdir(current_dir):
     if filename.endswith('.json'):
-        table_name = os.path.splitext(filename)[0]
-        table_name = table_name.replace('-', '_')  # Replace hyphens with underscores
+        # Replace hyphens with underscores and make lowercase in the table name
+        table_name = os.path.splitext(filename)[0].replace('-', '_').lower()
 
         # Check if the table already exists
         cursor.execute(
@@ -57,7 +57,11 @@ for filename in os.listdir(current_dir):
             sample_json = json.loads(file.readline())
 
         columns = sample_json.keys()
-        column_definitions = ', '.join([f'"{column}" VARCHAR' for column in columns])
+        column_definitions = [
+            f'"{column}" NUMERIC' if column in ['score', 'created_utc', 'ups', 'downs'] else f'"{column}" VARCHAR'
+            for column in columns
+        ]
+        column_definitions = ', '.join(column_definitions)
 
         # Create table
         create_table_query = sql.SQL("CREATE TABLE {} ({})").format(sql.Identifier(table_name), sql.SQL(column_definitions))

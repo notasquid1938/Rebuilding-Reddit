@@ -1,3 +1,6 @@
+##CMD To turn every file into JSON:
+##for %i in (*.) do ren "%i" "%i.json"
+
 import os
 import json
 import psycopg2
@@ -54,7 +57,11 @@ for filename in os.listdir(current_dir):
             sample_json = json.loads(file.readline())
 
         columns = sample_json.keys()
-        column_definitions = ', '.join([f'"{column}" VARCHAR' for column in columns])
+        column_definitions = [
+            f'"{column}" NUMERIC' if column in ['score', 'created_utc'] else f'"{column}" VARCHAR'
+            for column in columns
+        ]
+        column_definitions = ', '.join(column_definitions)
 
         # Create table
         create_table_query = sql.SQL("CREATE TABLE {} ({})").format(sql.Identifier(table_name), sql.SQL(column_definitions))
