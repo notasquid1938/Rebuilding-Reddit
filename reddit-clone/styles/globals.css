@@ -1,6 +1,7 @@
 :root {
   --reddit-orange: rgb(255, 69, 0);
   --reddit-darker-orange: rgba(255, 68, 0, 0.85);
+  --text-color: rgb(242,242,223);
 }
 
 html,

@@ -1,5 +1,5 @@
 .container {
-  max-width: 800px;
+  max-width: 90vw;
   margin: 0 auto;
 }
 
@@ -53,16 +53,17 @@
 
 .pagination {
   display: flex;
-  justify-content: center;
-  margin-top: 20px;
+  justify-content: space-evenly;
+  margin-bottom: 20px;
 }
 
 .pagination button {
+  display: flex;
   background-color: var(--reddit-orange);
-  color: white;
-  border: none;
+  color: var(--text-color);
+  border-radius: 3px;
   padding: 10px 20px;
-  margin: 0 5px;
+  justify-content: space-evenly;
   cursor: pointer;
   border-radius: 5px;
 }
@@ -71,7 +72,11 @@
   background-color: var(--reddit-darker-orange);
 }
 
-.pagination button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
+.postSubreddit, 
+.postAuthor,
+.postTitle,
+.postBody,
+.postUrl,
+.postScore {
+  color: var(--text-color);
 }

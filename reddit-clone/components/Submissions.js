@@ -52,12 +52,14 @@ const Submissions = ({ dateRange, subreddit, onPageChange }) => {
                   alt={`${post.subreddit} icon`}
                   className={styles.subredditImage}
                 />
-                <p className={styles.postSubreddit}>r/{post.subreddit} • {formatDateTime(post.created_utc)}</p>
-                <p className={styles.postAuthor}>u/{post.author}</p>
-                <h2 className={styles.postTitle}>{post.title}</h2>
-                <p className={styles.postBody}>{post.body}</p>
-                <p className={styles.postUrl}>URL: {post.url}</p>
-                <div className={styles.postScoreContainer}>
+                <div>
+                  <p className={styles.postSubreddit}>r/{post.subreddit} • {formatDateTime(post.created_utc)}</p>
+                  <p className={styles.postAuthor}>u/{post.author}</p>
+                  <h2 className={styles.postTitle}>{post.title}</h2>
+                  <p className={styles.postBody}>{post.body}</p>
+                  <p className={styles.postUrl}>URL: {post.url}</p>
+                  <div className={styles.postScoreContainer}>
+                </div>
                   <img
                     src={UpvoteIcon.src}
                     className={styles.upvoteIcon}
