@@ -58,7 +58,7 @@
 }
 
 .pagination button {
-  background-color: #007bff;
+  background-color: var(--reddit-orange);
   color: white;
   border: none;
   padding: 10px 20px;
@@ -68,7 +68,7 @@
 }
 
 .pagination button:hover {
-  background-color: #0056b3;
+  background-color: var(--reddit-darker-orange);
 }
 
 .pagination button:disabled {
