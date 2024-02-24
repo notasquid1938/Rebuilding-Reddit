@@ -3,7 +3,15 @@ import connectToDatabase from '@/db';
 export default async function handler(req, res) {
   try {
     // Extract the batch count from the request query
-    const { batch } = req.query;
+    let { batch } = req.query;
+
+    // Check if batch is not a number, return a 400 Bad Request response
+    if (isNaN(batch)) {
+      return res.status(400).json({ error: 'Batch parameter must be a number' });
+    }
+
+    // Convert batch to a number
+    batch = parseInt(batch);
 
     // Connect to the PostgreSQL database
     const db = await connectToDatabase();
@@ -32,7 +40,7 @@ export default async function handler(req, res) {
     // Send JSON response
     res.status(200).json(batchIds);
   } catch (error) {
-    console.error('Error connecting to the database or processing data:', error);
+    // Send a 500 Internal Server Error response
     res.status(500).json({ error: 'Internal Server Error' });
   }
 }

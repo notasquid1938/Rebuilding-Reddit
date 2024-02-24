@@ -7,7 +7,7 @@ function generateSiteMap(posts) {
        .map(({ id }) => {
          return `
        <url>
-           <loc>${`https://redditrebuilt.com/Sitemap/${id}.xml`}</loc>
+           <loc>${`https://redditrebuilt.com/Sitemap/${id}`}</loc>
        </url>
      `;
        })
