@@ -1,6 +1,15 @@
 import psycopg2
 from psycopg2 import OperationalError
 
+def drop_indexes(cursor, table_name):
+    try:
+        cursor.execute(f"DROP INDEX IF EXISTS \"{table_name}_score_index\";")
+        cursor.execute(f"DROP INDEX IF EXISTS \"{table_name}_id_index\";")
+        cursor.execute(f"DROP INDEX IF EXISTS \"{table_name}_subreddit_index\";")
+        print(f"Indexes dropped for table: {table_name}")
+    except OperationalError as e:
+        print(f"Error dropping indexes for table {table_name}: {e}")
+
 def create_index(cursor, table_name, column_name, index_name, index_type):
     try:
         cursor.execute(f"CREATE INDEX {index_name} ON \"{table_name}\" (\"{column_name}\" {index_type});")
@@ -26,10 +35,11 @@ try:
     cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
     table_names = cursor.fetchall()
 
-    # Iterate through tables and create indexes
+    # Iterate through tables and drop existing indexes, then create new indexes
     for table_name in table_names:
         table_name = table_name[0]
         if table_name.startswith('rs'):  # Adjust as per your naming convention
+            drop_indexes(cursor, table_name)
             create_index(cursor, table_name, 'score', f'"{table_name}_score_index"', 'DESC')
             create_index(cursor, table_name, 'id', f'"{table_name}_id_index"', 'ASC')
             create_index(cursor, table_name, 'subreddit', f'"{table_name}_subreddit_index"', 'ASC')
