@@ -13,6 +13,19 @@ const formatDateTime = (timestamp) => {
 
 const Comment = ({ comment }) => {
   const [showReplies, setShowReplies] = useState(false);
+  const [replies, setReplies] = useState([]);
+
+  const fetchReplies = async (commentId) => {
+    try {
+      const response = await fetch(`/api/Replies?commentId=${commentId}`);
+      const data = await response.json();
+      // Sort replies by score in descending order
+      const sortedReplies = data.replies.sort((a, b) => b.score - a.score);
+      setReplies(sortedReplies);
+    } catch (error) {
+      console.error('Error fetching replies:', error);
+    }
+  };
 
   return (
     <li className={styles.comment}>
@@ -37,13 +50,21 @@ const Comment = ({ comment }) => {
       </div>
       {comment.replies && comment.replies.length > 0 && (
         <div>
-          <button onClick={() => setShowReplies(!showReplies)}>
+          <button onClick={() => {
+            setShowReplies(!showReplies);
+            if (!showReplies) {
+              fetchReplies(comment.id); // Fetch replies for this comment
+            }
+          }}>
             {showReplies ? "Hide Replies" : "Show Replies"}
           </button>
           {showReplies && (
             <ul>
-              {comment.replies.map((reply, index) => (
-                <Comment key={index} comment={reply} />
+              {/* Render sorted replies */}
+              {replies.map((reply, index) => (
+                <li key={index} className={styles.reply}>
+                  <Comment comment={reply} />
+                </li>
               ))}
             </ul>
           )}

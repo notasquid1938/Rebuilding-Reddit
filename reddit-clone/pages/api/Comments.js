@@ -4,7 +4,7 @@ const replyColumns = ['id', 'parent_id', 'body', 'score', 'created_utc']; // Def
 
 export default async function handler(req, res) {
   try {
-    const { id, page = 1, commentsPerPage = 1 } = req.query;
+    const { id, page = 1, commentsPerPage = 10 } = req.query;
 
     if (!id) {
       return res.status(400).json({ error: 'Missing post ID' });
@@ -49,7 +49,7 @@ async function fetchCommentsWithReplies(db, postId, rcTables, page, commentsPerP
     const matchingComments = result.rows;
 
     for (const comment of matchingComments) {
-      const replies = await fetchRepliesRecursively(db, comment.id, rcTables);
+      const replies = await fetchFirstLevelReplies(db, comment.id, rcTables);
       allComments.push({ ...comment, replies });
       remainingPerPage--;
 
@@ -68,8 +68,8 @@ async function fetchCommentsWithReplies(db, postId, rcTables, page, commentsPerP
   return allComments;
 }
 
-async function fetchRepliesRecursively(db, parentId, rcTables) {
-  const allReplies = [];
+async function fetchFirstLevelReplies(db, parentId, rcTables) {
+  const firstLevelReplies = [];
 
   for (const table of rcTables) {
     const query = `
@@ -80,12 +80,8 @@ async function fetchRepliesRecursively(db, parentId, rcTables) {
     const result = await db.query(query);
     const matchingReplies = result.rows;
 
-    for (const reply of matchingReplies) {
-      const nestedReplies = await fetchRepliesRecursively(db, reply.id, rcTables);
-      reply.replies = nestedReplies;
-      allReplies.push(reply);
-    }
+    firstLevelReplies.push(...matchingReplies);
   }
 
-  return allReplies;
+  return firstLevelReplies;
 }
