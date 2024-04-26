@@ -1,41 +1,32 @@
-import { autocomplete } from '@algolia/autocomplete-js'
-import {
-  meilisearchAutocompleteClient,
-  getMeilisearchResults,
-} from '@meilisearch/autocomplete-client'
-import '@algolia/autocomplete-theme-classic'
+import React, { useState } from 'react';
+import styles from '../../styles/Search.module.css';
 
-const searchClient = meilisearchAutocompleteClient({
-  url: 'https://ms-adf78ae33284-106.lon.meilisearch.io', // Host
-  apiKey: 'a63da4928426f12639e19d62886f621130f3fa9ff3c7534c5d179f0f51c4f303'  // API key
-})
+const SearchInput = ({ value, onChange, suggestions, onSuggestionClick }) => {
+  return (
+    <div className={styles.inputContainer}>
+      <span className={styles.subredditPrefix}>r/</span>
+      <input
+        type="text"
+        placeholder="Search for a subreddit..."
+        value={value}
+        onChange={onChange}
+      />
+      {suggestions.length > 0 && (
+        <ul className={styles.inputSuggestions}>
+          {suggestions.map((suggestion, index) => (
+            <li className={styles.suggestion} key={index}>
+              <button
+                className={styles.suggestionButton}
+                onClick={() => onSuggestionClick(suggestion)}
+              >
+                {suggestion}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
-autocomplete({
-  container: '#autocomplete',
-  placeholder: 'Search for games',
-  getSources({ query }) {
-    return [
-      {
-        sourceId: 'steam-video-games',
-        getItems() {
-          return getMeilisearchResults({
-            searchClient,
-            queries: [
-              {
-                indexName: 'steam-video-games',
-                query,
-              },
-            ],
-          })
-        },
-        templates: {
-          item({ item, components, html }) {
-            return html`<div>
-              <div>${item.name}</div>
-            </div>`
-          },
-        },
-      },
-    ]
-  },
-})
+export default SearchInput;
