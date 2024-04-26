@@ -19,3 +19,4 @@ Data/imgur/*.warc
 /Data/imgur/20240106055037_f1cea2ab.1683789516-media
 /Data/imgur/imgur_*
 /Data/sitemap/ids/*.txt
+*.bat
