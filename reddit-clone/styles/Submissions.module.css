@@ -43,8 +43,10 @@
 }
 
 .subredditImage {
-  height: 32px;
-  width: 32px;
+  height: 6vmin;
+  width: 6vmin;
+  margin-right: 2vw;
+  border-radius: 6vmin;
 }
 
 .postUrl {
@@ -81,11 +83,30 @@
 
 .postSubreddit, 
 .postAuthor,
-.postTitle,
 .postBody,
-.postUrl,
 .postScore {
   color: var(--text-color);
+  font-size: 2vmin;
+  margin: 1vmin;
+  word-wrap: break-word;
+}
+
+.postUrl {
+  color: var(--text-color);
+  font-size: 2vmin;
+  margin: 1vmin;
+}
+
+.postAuthor {
+  color: var(--text-color);
+  font-size: 2vmin;
+  margin: 1vmin;
+}
+
+.postTitle {
+  color: var(--text-color);
+  font-size: 4vmin;
+  margin: 1vmin;
 }
 
 .pageNumber {
@@ -100,4 +121,9 @@
 .postImage {
   max-width: 80vmin;
   max-height: 80vmin;
+}
+
+.postTop {
+  display: flex;
+  align-items: center;
 }

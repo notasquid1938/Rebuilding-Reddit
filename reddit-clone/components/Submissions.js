@@ -66,13 +66,15 @@ const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
           <li key={post.id} className={styles.post}>
             <Link href={`/Thread/${post.id}`} passHref>
               <div>
-                <img
-                  src={`/api/SubredditIcons?subreddit=${post.subreddit}`}
-                  alt={`${post.subreddit} icon`}
-                  className={styles.subredditImage}
-                />
-                <div>
-                  <p className={styles.postSubreddit}>r/{post.subreddit} • {formatDateTime(post.created_utc)}</p>
+                <div className={styles.postContainer}>
+                  <div className={styles.postTop}>
+                    <img
+                      src={`/api/SubredditIcons?subreddit=${post.subreddit}`}
+                      alt={`${post.subreddit} icon`}
+                      className={styles.subredditImage}
+                    />
+                    <p className={styles.postSubreddit}>r/{post.subreddit} • {formatDateTime(post.created_utc)}</p>
+                  </div>
                   <p className={styles.postAuthor}>u/{post.author}</p>
                   <h2 className={styles.postTitle}>{post.title}</h2>
                   <div className={styles.postBody}>

@@ -47,12 +47,16 @@ export default async function handler(req, res) {
       }
     }
 
-    // Rank all posts from all tables collectively and limit to pageSize
+    // Construct the main query
     let query = `SELECT * FROM (${unionQuery}) AS all_posts`;
     if (subreddit && subreddit.toLowerCase() !== 'all') {
       query += ` WHERE subreddit = '${subreddit.toLowerCase()}'`;
     }
     query += ` ORDER BY score DESC LIMIT ${pageSize} OFFSET ${offset}`;
+
+    // Write the query to the log file
+    const logFilePath = path.join(__dirname, '../../../../logs/posts-log.txt');
+    fs.writeFileSync(logFilePath, `Query: ${query}\n`, { flag: 'w' });
 
     // Explain the query
     const explainQuery = `EXPLAIN ANALYZE ${query}`;
@@ -60,11 +64,7 @@ export default async function handler(req, res) {
     // Execute the explain query
     const explainResult = await db.query(explainQuery);
 
-    const logFilePath = path.join(__dirname, '../../../../logs/posts-log.txt');
-
-    // Clear existing content of the log file
-    fs.writeFileSync(logFilePath, '', { flag: 'w' });
-
+    // Append the explain results to the log file
     fs.writeFileSync(logFilePath, JSON.stringify(explainResult.rows) + '\n', { flag: 'a' });
 
     // Execute the main query
