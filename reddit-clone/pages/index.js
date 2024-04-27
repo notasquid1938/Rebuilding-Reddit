@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import Submissions from '../components/Submissions';
 import Search from '@/components/Search';
+import styles from '../styles/index.module.css'
 
 function HomePage() {
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
@@ -63,6 +64,7 @@ function HomePage() {
         <link rel="icon" type="image/png" href="../favicon.png"></link>
         <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
       </Helmet>
+      <p className={styles.Title}>Reddit Rebuilt</p>
       <Search onDateRangeChange={handleDateRangeChange} onSubredditChange={handleSubredditChange} />
       <Submissions dateRange={dateRange} subreddit={subreddit} page={pageNumber} onPageChange={handlePageChange} />
     </div>

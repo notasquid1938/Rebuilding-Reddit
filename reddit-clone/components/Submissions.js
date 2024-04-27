@@ -55,7 +55,6 @@ const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
 
   return (
     <div className={styles.container}>
-      <h1 className={styles.heading}>Reddit Rebuilt</h1>
       <div className={styles.pagination}>
         <button onClick={handlePrevPage} disabled={currentPage === 1}>Previous Page</button>
         <p className={styles.pageNumber}>Page {currentPage}</p>
