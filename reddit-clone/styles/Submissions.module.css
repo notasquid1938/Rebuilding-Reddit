@@ -66,12 +66,19 @@
   cursor: pointer;
   border-radius: 5px;
   width: 25vh;
-  font-size: 2em;
+  font-size: 3vmin;
+  font-weight: bold;
+  align-items: center;
 }
 
 .pagination button:hover {
   background-color: var(--reddit-darker-orange);
 }
+
+.pagination button:disabled {
+  visibility: hidden;
+}
+
 
 .postSubreddit, 
 .postAuthor,
@@ -84,4 +91,9 @@
 
 .pageNumber {
   color: var(--text-color);
+  font-size: 3vmin;
+}
+
+.nextPageNumber {
+  text-align: center;
 }
