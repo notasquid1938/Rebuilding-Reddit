@@ -20,3 +20,4 @@ Data/imgur/*.warc
 /Data/imgur/imgur_*
 /Data/sitemap/ids/*.txt
 *.bat
+/reddit-clone/logs/*.txt
