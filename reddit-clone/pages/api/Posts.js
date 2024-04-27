@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import connectToDatabase from '../../db';
 
 // Define the columns to select from each table
@@ -52,6 +54,20 @@ export default async function handler(req, res) {
     }
     query += ` ORDER BY score DESC LIMIT ${pageSize} OFFSET ${offset}`;
 
+    // Explain the query
+    const explainQuery = `EXPLAIN ANALYZE ${query}`;
+
+    // Execute the explain query
+    const explainResult = await db.query(explainQuery);
+
+    const logFilePath = path.join(__dirname, '../../../../logs/posts-log.txt');
+
+    // Clear existing content of the log file
+    fs.writeFileSync(logFilePath, '', { flag: 'w' });
+
+    fs.writeFileSync(logFilePath, JSON.stringify(explainResult.rows) + '\n', { flag: 'a' });
+
+    // Execute the main query
     const { rows } = await db.query(query);
     res.status(200).json(rows);
   } catch (error) {
