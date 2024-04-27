@@ -79,7 +79,6 @@
   visibility: hidden;
 }
 
-
 .postSubreddit, 
 .postAuthor,
 .postTitle,
@@ -96,4 +95,9 @@
 
 .nextPageNumber {
   text-align: center;
+}
+
+.postImage {
+  max-width: 80vmin;
+  max-height: 80vmin;
 }

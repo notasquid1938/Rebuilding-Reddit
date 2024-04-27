@@ -5,9 +5,9 @@ import styles from '../styles/Submissions.module.css';
 import UpvoteIcon from '../public/upvote.svg';
 import DownvoteIcon from '../public/downvote.svg';
 
-const Submissions = ({ dateRange, subreddit, onPageChange }) => {
+const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
   const [posts, setPosts] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(page);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -22,20 +22,34 @@ const Submissions = ({ dateRange, subreddit, onPageChange }) => {
     fetchData();
   }, [dateRange, subreddit, currentPage]);
 
+  useEffect(() => {
+    setCurrentPage(page);
+  }, [page]);
+
   const formatDateTime = (timestamp) => {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString();
   };
 
   const handleNextPage = () => {
-    setCurrentPage(currentPage + 1);
-    onPageChange(currentPage + 1);
+    const nextPage = currentPage + 1;
+    setCurrentPage(nextPage);
+    onPageChange(nextPage);
   };
 
   const handlePrevPage = () => {
     if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-      onPageChange(currentPage - 1);
+      const prevPage = currentPage - 1;
+      setCurrentPage(prevPage);
+      onPageChange(prevPage);
+    }
+  };
+
+  const renderPostBody = (post) => {
+    if (post.url.includes('imgur.com')) {
+      return <img src={post.url} alt="Imgur Image" className={styles.postImage} />;
+    } else {
+      return <a href={post.url}>{post.url}</a>;
     }
   };
 
@@ -61,8 +75,9 @@ const Submissions = ({ dateRange, subreddit, onPageChange }) => {
                   <p className={styles.postSubreddit}>r/{post.subreddit} • {formatDateTime(post.created_utc)}</p>
                   <p className={styles.postAuthor}>u/{post.author}</p>
                   <h2 className={styles.postTitle}>{post.title}</h2>
-                  <p className={styles.postBody}>{post.body}</p>
-                  <p className={styles.postUrl}>URL: {post.url}</p>
+                  <div className={styles.postBody}>
+                    {renderPostBody(post)}
+                  </div>
                   <div className={styles.postScoreContainer}>
                     <img
                       src={UpvoteIcon.src}
