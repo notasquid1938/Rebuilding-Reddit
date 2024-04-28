@@ -147,7 +147,9 @@ const Search = ({ onDateRangeChange, onSubredditChange}) => {
             </div>
           )}
         </div>
-        <button type="submit">Submit</button>
+        <div>
+          <button className={styles.submitButton} type="submit">Submit</button>
+        </div>
       </form>
     </div>
   );  

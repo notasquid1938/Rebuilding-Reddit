@@ -14,10 +14,13 @@
 }
 
 .post {
-  margin-bottom: 20px;
+  margin-bottom: 2vmin;
   border: 1px solid #ccc;
-  padding: 10px;
-  border-radius: 5px;
+  padding-left: 1vw;
+  padding-right: 1vw;
+  padding-top: 1vh;
+  padding-bottom: 1vh;
+  border-radius: 1vmin;
 }
 
 .postTitle {
@@ -43,10 +46,10 @@
 }
 
 .subredditImage {
-  height: 6vmin;
-  width: 6vmin;
-  margin-right: 2vw;
-  border-radius: 6vmin;
+  height: 4vmin;
+  width: 4vmin;
+  margin-right: 1vw;
+  border-radius: 4vmin;
 }
 
 .postUrl {
@@ -56,21 +59,22 @@
 .pagination {
   display: flex;
   justify-content: space-evenly;
-  margin-bottom: 20px;
+  margin-bottom: 2vh;
 }
 
 .pagination button {
   display: flex;
   background-color: var(--reddit-orange);
   color: var(--text-color);
-  padding: 10px 20px;
+  padding: 0;
   justify-content: space-evenly;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 1vmin;
   width: 25vh;
   font-size: 3vmin;
   font-weight: bold;
   align-items: center;
+  margin: 0;
 }
 
 .pagination button:hover {
@@ -86,27 +90,27 @@
 .postBody,
 .postScore {
   color: var(--text-color);
-  font-size: 2vmin;
-  margin: 1vmin;
+  font-size: 1.5vmin;
+  margin-top: 1vmin;
   word-wrap: break-word;
 }
 
 .postUrl {
   color: var(--text-color);
-  font-size: 2vmin;
+  font-size: 1.5vmin;
   margin: 1vmin;
 }
 
 .postAuthor {
   color: var(--text-color);
-  font-size: 2vmin;
-  margin: 1vmin;
+  font-size: 1.5vmin;
+  margin-top: 1vmin;
 }
 
 .postTitle {
   color: var(--text-color);
-  font-size: 4vmin;
-  margin: 1vmin;
+  font-size: 3vmin;
+  margin-top: 1vmin;
 }
 
 .pageNumber {
