@@ -1,3 +1,4 @@
+import os
 import psycopg2
 from psycopg2 import OperationalError
 
@@ -31,22 +32,20 @@ try:
     )
     cursor = connection.cursor()
 
-    # Get a list of table names
-    cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
-    table_names = cursor.fetchall()
+    # Get a list of text file names in the directory
+    txt_files = [filename for filename in os.listdir('.') if filename.endswith('.txt')]
 
-    # Iterate through tables and drop existing indexes, then create new indexes
-    for table_name in table_names:
-        table_name = table_name[0]
-        if table_name.startswith('rs'):  # Adjust as per your naming convention
-            drop_indexes(cursor, table_name)
-            create_index(cursor, table_name, 'score', f'"{table_name}_score_index"', 'DESC')
-            create_index(cursor, table_name, 'id', f'"{table_name}_id_index"', 'ASC')
-            create_index(cursor, table_name, 'subreddit', f'"{table_name}_subreddit_index"', 'ASC')
+    # Extract table names from file names and create indexes accordingly
+    for txt_file in txt_files:
+        table_name = txt_file.split('.')[0]  # Extract table name from file name
+        drop_indexes(cursor, table_name)
+        create_index(cursor, table_name, 'score', f'"{table_name}_score_index"', 'DESC')
+        create_index(cursor, table_name, 'id', f'"{table_name}_id_index"', 'ASC')
+        create_index(cursor, table_name, 'subreddit', f'"{table_name}_subreddit_index"', 'ASC')
 
-    # Commit the transaction after all indexes are created
-    connection.commit()
-    print("Indexes Committed")
+        # Commit and print after each table's indexes are done
+        connection.commit()
+        print("Indexes Committed for table:", table_name)
 
 except OperationalError as e:
     print(f"Error connecting to PostgreSQL: {e}")
