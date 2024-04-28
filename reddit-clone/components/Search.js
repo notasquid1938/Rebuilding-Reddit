@@ -92,62 +92,64 @@ const Search = ({ onDateRangeChange, onSubredditChange}) => {
       </div>
       
       <form className={styles.formContainer} onSubmit={handleSubmit}>
-        <label className={styles.label} htmlFor="start">Start Date:</label>
-        <div className={styles.selectContainer}>
-          <select
-            id="start"
-            className={styles.select}
-            onChange={(e) => handleDateChange(e.target.value, 'start')}
-            value={startDate}
-            onFocus={() => setIsStartDropdownOpened(true)}
-            onBlur={() => setIsStartDropdownOpened(false)}
-          >
-            <option value="">Select Start Date</option>
-            {availableCollections.map((collection) => (
-              <option key={collection} value={collection}>
-                {collection}
-              </option>
-            ))}
-          </select>
-          {isStartDropdownOpened && (
-            <div className={styles.dropdownList}>
+        <div className={styles.dateSelection}>
+          <label className={styles.label} htmlFor="start">Start Date:</label>
+          <div className={styles.selectContainer}>
+            <select
+              id="start"
+              className={styles.select}
+              onChange={(e) => handleDateChange(e.target.value, 'start')}
+              value={startDate}
+              onFocus={() => setIsStartDropdownOpened(true)}
+              onBlur={() => setIsStartDropdownOpened(false)}
+            >
+              <option value="">Select Start Date</option>
               {availableCollections.map((collection) => (
-                <div key={collection} className={styles.option} onClick={() => handleDateChange(collection, 'start')}>
+                <option key={collection} value={collection}>
                   {collection}
-                </div>
+                </option>
               ))}
-            </div>
-          )}
-        </div>
-  
-        <label className={styles.label} htmlFor="end">End Date:</label>
-        <div className={styles.selectContainer}>
-          <select
-            id="end"
-            className={styles.select}
-            onChange={(e) => handleDateChange(e.target.value, 'end')}
-            value={endDate}
-            onFocus={() => setIsEndDropdownOpened(true)}
-            onBlur={() => setIsEndDropdownOpened(false)}
-          >
-            <option value="">Select End Date</option>
-            {availableCollections.map((collection) => (
-              <option key={collection} value={collection}>
-                {collection}
-              </option>
-            ))}
-          </select>
-          {isEndDropdownOpened && (
-            <div className={styles.dropdownList}>
+            </select>
+            {isStartDropdownOpened && (
+              <div className={styles.dropdownList}>
+                {availableCollections.map((collection) => (
+                  <div key={collection} className={styles.option} onClick={() => handleDateChange(collection, 'start')}>
+                    {collection}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+    
+          <label className={styles.label} htmlFor="end">End Date:</label>
+          <div className={styles.selectContainer}>
+            <select
+              id="end"
+              className={styles.select}
+              onChange={(e) => handleDateChange(e.target.value, 'end')}
+              value={endDate}
+              onFocus={() => setIsEndDropdownOpened(true)}
+              onBlur={() => setIsEndDropdownOpened(false)}
+            >
+              <option value="">Select End Date</option>
               {availableCollections.map((collection) => (
-                <div key={collection} className={styles.option} onClick={() => handleDateChange(collection, 'end')}>
+                <option key={collection} value={collection}>
                   {collection}
-                </div>
+                </option>
               ))}
-            </div>
-          )}
+            </select>
+            {isEndDropdownOpened && (
+              <div className={styles.dropdownList}>
+                {availableCollections.map((collection) => (
+                  <div key={collection} className={styles.option} onClick={() => handleDateChange(collection, 'end')}>
+                    {collection}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-        <div>
+        <div className={styles.submitContainer}>
           <button className={styles.submitButton} type="submit">Submit</button>
         </div>
       </form>

@@ -60,6 +60,8 @@
   display: flex;
   justify-content: space-evenly;
   margin-bottom: 2vh;
+  align-items: center;
+  height: 6vh;
 }
 
 .pagination button {
@@ -70,11 +72,13 @@
   justify-content: space-evenly;
   cursor: pointer;
   border-radius: 1vmin;
-  width: 25vh;
+  width: 15vw;
+  height: 5vh;
   font-size: 3vmin;
   font-weight: bold;
   align-items: center;
   margin: 0;
+  border: 0;
 }
 
 .pagination button:hover {

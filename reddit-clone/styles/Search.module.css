@@ -43,9 +43,10 @@
 }
 
 .selectContainer {
-  position: relative;
   margin-bottom: 1vh;
   margin-top: 1vh;
+  margin-left: 1vw;
+  margin-right: 1vw;
 }
 
 .select {
@@ -76,6 +77,7 @@
 .formContainer {
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .searchContainer {
@@ -83,9 +85,20 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 1vh;
+  margin: 0 auto 1vh;
 }
 
 .submitButton {
   font-size: 4vmin;
+}
+
+.dateSelection {
+  font-size: 2vmin;
+  display: flex;
+  align-items: center;
+}
+
+.submitContainer {
+  display: flex;
+  justify-content: center;
 }
