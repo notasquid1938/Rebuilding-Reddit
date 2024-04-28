@@ -1,3 +1,4 @@
+import os
 import psycopg2
 from psycopg2 import OperationalError
 
@@ -31,21 +32,22 @@ try:
     )
     cursor = connection.cursor()
 
-    # Get a list of table names starting with 'rc'
-    cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'rc%'")
-    table_names = cursor.fetchall()
+    # Get the current working directory
+    current_directory = os.getcwd()
 
-    # Iterate through tables
+    # Get a list of table names from the names of .txt files in the directory
+    txt_files = [file for file in os.listdir(current_directory) if file.endswith(".txt")]
+    table_names = [file.split(".")[0] for file in txt_files]
+
+    # Iterate through table names
     for table_name in table_names:
-        table_name = table_name[0]
         drop_indexes(cursor, table_name)  # Drop indexes for the current table
         create_index(cursor, table_name, 'parent_id', f'"{table_name}_parent_id_index"', 'ASC')
         create_index(cursor, table_name, 'link_id', f'"{table_name}_link_id_index"', 'DESC')
         create_index(cursor, table_name, 'score', f'"{table_name}_score_index"', 'DESC')
-
-    # Commit the transaction after all indexes are created
-    connection.commit()
-    print("Indexes Committed")
+        # Commit the transaction after each table is processed
+        connection.commit()
+        print(f"Indexes Committed for table: {table_name}")
 
 except OperationalError as e:
     print(f"Error connecting to PostgreSQL: {e}")

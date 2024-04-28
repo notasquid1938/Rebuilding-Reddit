@@ -1,7 +1,9 @@
 /Data/reddit/comments/*.json
 /Data/reddit/submissions/*.json
 /Data/reddit/comments/*.zst
+/Data/reddit/comments/*.txt
 /Data/reddit/submissions/*.zst
+/Data/reddit/submissions/*.txt
 /subreddits(HUGE).txt
 /Data/*.parts
 /Data/reddit/icons/*.png
