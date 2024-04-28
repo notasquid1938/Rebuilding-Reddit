@@ -1,6 +1,3 @@
-##CMD To turn every file into JSON:
-##for %i in (*.) do ren "%i" "%i.json"
-
 import os
 import json
 import psycopg2
@@ -91,7 +88,18 @@ for filename in os.listdir(current_dir):
             if batch_data:
                 insert_in_batches(table_name, columns, batch_data)
 
-        print(f"Finished processing table: {table_name}")
+        # Delete the JSON file
+        os.remove(os.path.join(current_dir, filename))
+        print(f"Deleted JSON file: {filename}")
+
+        # Create a text document with the same name as the table
+        with open(os.path.join(current_dir, f"{table_name}.txt"), 'w') as txt_file:
+            txt_file.write(f"Table name: {table_name}\n")
+            txt_file.write("Columns:\n")
+            for column in columns:
+                txt_file.write(f"- {column}\n")
+
+        print(f"Created text document for table: {table_name}")
 
 # Close the connection
 cursor.close()

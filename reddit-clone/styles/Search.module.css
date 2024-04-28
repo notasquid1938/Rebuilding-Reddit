@@ -1,8 +1,8 @@
 .inputContainer {
-  position: relative;
   text-align-last: center;
   text-align: -webkit-center;
   margin: 1vmin;
+  font-size: 3vmin;
 }
 
 .inputSuggestions {
@@ -42,13 +42,10 @@
   margin: auto;
 }
 
-.label {
-  margin-bottom: 8px;
-}
-
 .selectContainer {
   position: relative;
   margin-bottom: 1vh;
+  margin-top: 1vh;
 }
 
 .select {
@@ -77,7 +74,8 @@
 }
 
 .formContainer {
-  padding: 5px;
+  display: flex;
+  flex-direction: column;
 }
 
 .searchContainer {
