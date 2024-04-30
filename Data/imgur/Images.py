@@ -1,3 +1,6 @@
+# RUN THIS IN THE IMGUR FOLDER
+
+import os
 import warcio
 from urllib.parse import urlparse, unquote
 
@@ -8,6 +11,10 @@ def get_filename_from_url(url):
     return filename
 
 def save_media_from_warc(warc_filename, output_directory):
+    # Create the output directory if it doesn't exist
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+
     with open(warc_filename, 'rb') as warc_file:
         for record in warcio.ArchiveIterator(warc_file):
             if record.rec_type == 'response':
@@ -20,7 +27,7 @@ def save_media_from_warc(warc_filename, output_directory):
 
                     # Get the filename from the URL
                     filename = get_filename_from_url(url)
-                    output_media_filename = f"{output_directory}/{filename}"
+                    output_media_filename = os.path.join(output_directory, filename)
 
                     try:
                         # Save the media to a file
@@ -34,7 +41,7 @@ def save_media_from_warc(warc_filename, output_directory):
                             error_file.write(f"Error: {str(e)} - URL: {url}\n")
 
 if __name__ == "__main__":
-    warc_filename = "./Rebuild-Reddit/Data/imgur/imgur-2023-01.warc"
-    output_directory = "./Data/imgur/imgur-2023-01"
+    warc_filename = "./output.warc"
+    output_directory = "./output-warc/"
 
     save_media_from_warc(warc_filename, output_directory)

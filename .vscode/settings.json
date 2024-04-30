@@ -22,5 +22,6 @@
     "reddit-clone/.gitignore",
     "reddit-clone/package-lock.json",
     "Data/reddit/icons"
-  ]
+  ],
+  "git.ignoreLimitWarning": true
 }

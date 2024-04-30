@@ -24,3 +24,5 @@ Data/imgur/*.warc
 *.bat
 /reddit-clone/logs/*.txt
 /Data/imgur/*.zst
+/Data/imgur/imgur-*
+/Data/imgur/error.txt
