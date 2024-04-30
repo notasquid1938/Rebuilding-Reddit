@@ -1,6 +1,8 @@
 Decompression Command:
 python3 Decompress.py ./imgur_20240106055037_f1cea2ab.1683789516.megawarc.warc.zst > imgur_20240106055037_f1cea2ab.1683789516.megawarc.warc
 
+Go to internet archive and sort oldest to newest by date added for numbering
+
 
 Imgur Supports all these formats:
 

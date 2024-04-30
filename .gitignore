@@ -23,3 +23,4 @@ Data/imgur/*.warc
 /Data/sitemap/ids/*.txt
 *.bat
 /reddit-clone/logs/*.txt
+/Data/imgur/*.zst

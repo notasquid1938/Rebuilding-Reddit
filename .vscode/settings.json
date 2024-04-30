@@ -1,24 +1,26 @@
 {
-    "files.exclude": {
-        "**/.git": true,
-        "**/.svn": true,
-        "**/.hg": true,
-        "**/CVS": true,
-        "**/.DS_Store": true,
-        "**/Thumbs.db": true,
-        "reddit-clone/.next": true,
-        "reddit-clone/node_modules": true,
-        "reddit-clone/jsconfig.json": true,
-        "reddit-clone/next.config.js": true,
-        "reddit-clone/.gitignore": true,
-        "reddit-clone/package-lock.json": true
-    },
-    "hide-files.files": [
-        "reddit-clone/.next",
-        "reddit-clone/node_modules",
-        "reddit-clone/jsconfig.json",
-        "reddit-clone/next.config.js",
-        "reddit-clone/.gitignore",
-        "reddit-clone/package-lock.json",
-    ]
+  "files.exclude": {
+    "**/.git": true,
+    "**/.svn": true,
+    "**/.hg": true,
+    "**/CVS": true,
+    "**/.DS_Store": true,
+    "**/Thumbs.db": true,
+    "reddit-clone/.next": true,
+    "reddit-clone/node_modules": true,
+    "reddit-clone/jsconfig.json": true,
+    "reddit-clone/next.config.js": true,
+    "reddit-clone/.gitignore": true,
+    "reddit-clone/package-lock.json": true,
+    "Data\\reddit\\icons": true
+  },
+  "hide-files.files": [
+    "reddit-clone/.next",
+    "reddit-clone/node_modules",
+    "reddit-clone/jsconfig.json",
+    "reddit-clone/next.config.js",
+    "reddit-clone/.gitignore",
+    "reddit-clone/package-lock.json",
+    "Data/reddit/icons"
+  ]
 }
