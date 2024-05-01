@@ -4,6 +4,8 @@ import os
 import warcio
 from urllib.parse import urlparse, unquote
 
+archive_name = "imgur-2023-02"
+
 def get_filename_from_url(url):
     # Parse the URL and extract the filename
     parsed_url = urlparse(url)
@@ -41,7 +43,7 @@ def save_media_from_warc(warc_filename, output_directory):
                             error_file.write(f"Error: {str(e)} - URL: {url}\n")
 
 if __name__ == "__main__":
-    warc_filename = "./output.warc"
-    output_directory = "./output-warc/"
+    warc_filename = "./" + archive_name + ".warc"
+    output_directory = "./" + archive_name + "/"
 
     save_media_from_warc(warc_filename, output_directory)

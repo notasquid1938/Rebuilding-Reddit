@@ -1,10 +1,12 @@
-import io
 import os
 import struct
 import subprocess
 import sys
-import tempfile
 
+imgur_archive = 'imgur-2023-06'
+
+input_file = imgur_archive + '.warc.zst' 
+output_file = imgur_archive + '.warc'
 
 def get_dict(fp):
     magic = fp.read(4)
@@ -33,9 +35,6 @@ def get_dict(fp):
         d = out
     return d
 
-
-input_file = 'imgur-2023-01.warc.zst'  # Set your input file path here
-
 if not input_file:
     print('Input file not provided.', file=sys.stderr)
     sys.exit(1)
@@ -50,9 +49,6 @@ with open(input_file, 'rb') as fp:
 # Write the dictionary to a text file
 with open('dict.txt', 'wb') as dict_file:
     dict_file.write(d)
-
-# Extracting the dictionary and decompressing the file using the dictionary
-output_file = 'output.warc'
 
 subprocess.run(['zstd', '-d', input_file, '-D', 'dict.txt', '-o', output_file], check=True)
 
