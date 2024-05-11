@@ -5,7 +5,7 @@ client = meilisearch.Client('http://127.0.0.1:7700')
 index = client.index('subreddits')
 
 # Read subreddit names from the file
-file_path = 'subreddits.txt'
+file_path = 'subreddits(HUGE).txt'
 batch_size = 10000
 documents = []
 
