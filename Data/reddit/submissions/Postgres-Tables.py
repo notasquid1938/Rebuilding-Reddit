@@ -16,16 +16,6 @@ cursor = conn.cursor()
 # Get the current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Function to create partitions
-def create_partitions(table_name, subreddit_values):
-    for column_value in subreddit_values:
-        partition_name = f"{table_name}_{column_value}"
-        create_partition_query = sql.SQL("""
-            CREATE TABLE {} PARTITION OF {}
-            FOR VALUES IN (%s)
-        """).format(sql.Identifier(partition_name), sql.Identifier(table_name))
-        cursor.execute(create_partition_query, [column_value])
-
 # Function to insert data in batches
 def insert_in_batches(table_name, columns, data):
     batch_size = 100000
@@ -70,29 +60,9 @@ for filename in os.listdir(current_dir):
         ]
         column_definitions = ', '.join(column_definitions)
 
-        # Create table with partitioning
-        create_table_query = sql.SQL("""
-            CREATE TABLE {} (
-                {},
-                PRIMARY KEY (subreddit)
-            )
-            PARTITION BY LIST (subreddit)
-        """).format(sql.Identifier(table_name), sql.SQL(column_definitions))
+        # Create table
+        create_table_query = sql.SQL("CREATE TABLE {} ({})").format(sql.Identifier(table_name), sql.SQL(column_definitions))
         cursor.execute(create_table_query)
-
-        # Read JSON file to get unique subreddit values
-        subreddit_values = set()
-        with open(os.path.join(current_dir, filename), 'r', encoding='utf-8') as file:
-            for line in file:
-                try:
-                    json_data = json.loads(line)
-                    subreddit_values.add(json_data.get('subreddit', ''))
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding JSON in file '{filename}': {e}.")
-                    continue
-
-        # Create partitions
-        create_partitions(table_name, subreddit_values)
 
         # Read JSON file and insert data into PostgreSQL in batches
         with open(os.path.join(current_dir, filename), 'r', encoding='utf-8') as file:
