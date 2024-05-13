@@ -10,7 +10,6 @@ function HomePage() {
   const [pageNumber, setPageNumber] = useState(1);
 
   useEffect(() => {
-    // Load data from local storage when component mounts
     const savedStartDate = localStorage.getItem('startDate');
     const savedEndDate = localStorage.getItem('endDate');
     const savedSubreddit = localStorage.getItem('subreddit');
@@ -21,22 +20,19 @@ function HomePage() {
       setSubreddit(savedSubreddit);
       setPageNumber(parseInt(savedPageNumber));
     } else {
-      // If no data in local storage, set default values
       setDateRange({ startDate: '2008-12', endDate: '2008-12' });
       setSubreddit('all');
       setPageNumber(1);
-      // Save default values to local storage
       localStorage.setItem('startDate', '2008-12');
       localStorage.setItem('endDate', '2008-12');
       localStorage.setItem('subreddit', 'all');
       localStorage.setItem('pageNumber', '1');
     }
-  }, []); // Empty dependency array ensures this effect runs only once on mount
+  }, []); 
 
   const handleDateRangeChange = (startDate, endDate) => {
     setDateRange({ startDate, endDate });
     setPageNumber(1);
-    // Save to local storage
     localStorage.setItem('startDate', startDate);
     localStorage.setItem('endDate', endDate);
     localStorage.setItem('pageNumber', '1');
@@ -45,14 +41,12 @@ function HomePage() {
   const handleSubredditChange = (selectedSubreddit) => {
     setSubreddit(selectedSubreddit);
     setPageNumber(1);
-    // Save to local storage
     localStorage.setItem('subreddit', selectedSubreddit);
     localStorage.setItem('pageNumber', '1');
   };
 
   const handlePageChange = (page) => {
     setPageNumber(page);
-    // Save to local storage
     localStorage.setItem('pageNumber', page.toString());
   };
 

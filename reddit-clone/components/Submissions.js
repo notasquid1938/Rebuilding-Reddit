@@ -4,23 +4,23 @@ import Link from 'next/link';
 import styles from '../styles/Submissions.module.css';
 import UpvoteIcon from '../public/upvote.svg';
 import DownvoteIcon from '../public/downvote.svg';
-import LoadingSpinner from './LoadingSpinner'; // Import your loading spinner component
+import LoadingSpinner from './LoadingSpinner'; 
 
 const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
   const [posts, setPosts] = useState([]);
   const [currentPage, setCurrentPage] = useState(page);
-  const [isLoading, setIsLoading] = useState(false); // State to track loading
+  const [isLoading, setIsLoading] = useState(false); 
 
   useEffect(() => {
     const fetchData = async () => {
-      setIsLoading(true); // Set loading to true when starting API request
+      setIsLoading(true); 
       try {
         const response = await axios.get(`/api/Posts?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&subreddit=${subreddit}&page=${currentPage}`);
         setPosts(response.data);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
-        setIsLoading(false); // Set loading to false regardless of success or failure
+        setIsLoading(false); 
       }
     };
 
@@ -65,8 +65,8 @@ const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
         <p className={styles.pageNumber}>Page {currentPage}</p>
         <button onClick={handleNextPage}>Next Page</button>
       </div>
-      {isLoading && <LoadingSpinner />} {/* Render loading spinner if loading is true */}
-      {!isLoading && ( // Conditionally render the post list when not loading
+      {isLoading && <LoadingSpinner />}
+      {!isLoading && ( 
         <div>
           {posts.length === 0 ? (
             <p>No posts found</p>
