@@ -67,48 +67,54 @@ const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
       </div>
       {isLoading && <LoadingSpinner />} {/* Render loading spinner if loading is true */}
       {!isLoading && ( // Conditionally render the post list when not loading
-        <ul className={styles.postList}>
-          {posts.map((post) => (
-            <li key={post.id} className={styles.post}>
-              <Link href={`/Thread/${post.id}`} passHref>
-                <div>
-                  <div className={styles.postContainer}>
-                    <div className={styles.postTop}>
-                      <img
-                        src={`/api/SubredditIcons?subreddit=${post.subreddit}`}
-                        alt={`${post.subreddit} icon`}
-                        className={styles.subredditImage}
-                      />
-                      <p className={styles.postSubreddit}>r/{post.subreddit} • {formatDateTime(post.created_utc)}</p>
+        <div>
+          {posts.length === 0 ? (
+            <p>No posts found</p>
+          ) : (
+            <ul className={styles.postList}>
+              {posts.map((post) => (
+                <li key={post.id} className={styles.post}>
+                  <Link href={`/Thread/${post.id}`} passHref>
+                    <div>
+                      <div className={styles.postContainer}>
+                        <div className={styles.postTop}>
+                          <img
+                            src={`/api/SubredditIcons?subreddit=${post.subreddit}`}
+                            alt={`${post.subreddit} icon`}
+                            className={styles.subredditImage}
+                          />
+                          <p className={styles.postSubreddit}>r/{post.subreddit} • {formatDateTime(post.created_utc)}</p>
+                        </div>
+                        <p className={styles.postAuthor}>u/{post.author}</p>
+                        <h2 className={styles.postTitle}>{post.title}</h2>
+                        <div className={styles.postBody}>
+                          {renderPostBody(post)}
+                        </div>
+                        <div className={styles.postScoreContainer}>
+                          <img
+                            src={UpvoteIcon.src}
+                            className={styles.upvoteIcon}
+                            height={UpvoteIcon.height}
+                            width={UpvoteIcon.width}
+                            alt="Upvote Icon"
+                          />
+                          <p className={styles.postScore}>{post.score}</p>
+                          <img
+                            src={DownvoteIcon.src}
+                            className={styles.downvoteIcon}
+                            height={DownvoteIcon.height}
+                            width={DownvoteIcon.width}
+                            alt="Downvote Icon"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <p className={styles.postAuthor}>u/{post.author}</p>
-                    <h2 className={styles.postTitle}>{post.title}</h2>
-                    <div className={styles.postBody}>
-                      {renderPostBody(post)}
-                    </div>
-                    <div className={styles.postScoreContainer}>
-                      <img
-                        src={UpvoteIcon.src}
-                        className={styles.upvoteIcon}
-                        height={UpvoteIcon.height}
-                        width={UpvoteIcon.width}
-                        alt="Upvote Icon"
-                      />
-                      <p className={styles.postScore}>{post.score}</p>
-                      <img
-                        src={DownvoteIcon.src}
-                        className={styles.downvoteIcon}
-                        height={DownvoteIcon.height}
-                        width={DownvoteIcon.width}
-                        alt="Downvote Icon"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
       <div className={styles.pagination}>
         <button onClick={handlePrevPage} disabled={currentPage === 1}>Previous Page</button>
@@ -117,6 +123,7 @@ const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
       </div>
     </div>
   );
+  
 };
 
 export default Submissions;
