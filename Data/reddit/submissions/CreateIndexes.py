@@ -1,4 +1,4 @@
-##MUST BE RUN IN SUBMISSIONS DIRECTORY
+#COMPOSITE INDEX BROUGHT A GREAT SPEEDUP
 
 import os
 import psycopg2
@@ -9,6 +9,7 @@ def drop_indexes(cursor, table_name):
         cursor.execute(f"DROP INDEX IF EXISTS \"{table_name}_score_index\";")
         cursor.execute(f"DROP INDEX IF EXISTS \"{table_name}_id_index\";")
         cursor.execute(f"DROP INDEX IF EXISTS \"{table_name}_subreddit_index\";")
+        cursor.execute(f"DROP INDEX IF EXISTS \"{table_name}_subreddit_score_index\";")
         print(f"Indexes dropped for table: {table_name}")
     except OperationalError as e:
         print(f"Error dropping indexes for table {table_name}: {e}")
@@ -22,6 +23,16 @@ def create_index(cursor, table_name, column_name, index_name, index_type):
             print(f"{index_type} index for '{column_name}' column already exists in table: {table_name}")
         else:
             print(f"Error creating index for '{column_name}' column in table {table_name}: {e}")
+
+def create_composite_index(cursor, table_name):
+    try:
+        cursor.execute(f"CREATE INDEX \"{table_name}_subreddit_score_index\" ON \"{table_name}\" (\"subreddit\" ASC, \"score\" DESC);")
+        print(f"Composite index on 'subreddit' and 'score' created for table: {table_name}")
+    except OperationalError as e:
+        if "already exists" in str(e):
+            print(f"Composite index on 'subreddit' and 'score' already exists in table: {table_name}")
+        else:
+            print(f"Error creating composite index on 'subreddit' and 'score' in table {table_name}: {e}")
 
 try:
     # Connect to the database and create cursor
@@ -44,6 +55,7 @@ try:
         create_index(cursor, table_name, 'score', f'"{table_name}_score_index"', 'DESC')
         create_index(cursor, table_name, 'id', f'"{table_name}_id_index"', 'ASC')
         create_index(cursor, table_name, 'subreddit', f'"{table_name}_subreddit_index"', 'ASC')
+        create_composite_index(cursor, table_name)
 
         # Commit and print after each table's indexes are done
         connection.commit()

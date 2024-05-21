@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     const logFilePath = path.join(__dirname, '../../../../logs/posts-log.txt');
     fs.writeFileSync(logFilePath, `${query}\n`, { flag: 'w' });
 
-    const explainQuery = `EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ${query}`;
+    const explainQuery = `EXPLAIN (ANALYZE, COSTS, FORMAT JSON) ${query}`;
 
     // Execute the explain query
     const explainResult = await db.query(explainQuery);
