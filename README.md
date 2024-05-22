@@ -3,7 +3,7 @@ https://redditrebuilt.com/ (Might be down, not hosted often)
   
 This is a NextJS website that attempts to create as thorough as possible an archive of reddit. It accomplishes this by creating a convenient way to view all the content from Pushift's archives of Reddit's comments and submissions over the years.
 
-It uses Postgres to store all the reddit pushshift archives in tables and [Meili Search](https://www.meilisearch.com/) to provide subreddit autofill suggestions. You can search the archive using a selected date range and optionally add a specific subreddit.
+It uses Postgres to store all the reddit pushshift archives in tables and query them as necessary. You can search the archive using a selected date range and optionally add a specific subreddit.
 
 ## Setup Instructions
 1. Clone the github repo
