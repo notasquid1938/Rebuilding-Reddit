@@ -14,26 +14,33 @@ export default async function handler(req, res) {
     const pageSize = 10;
     const offset = (page - 1) * pageSize;
 
-    if (!startDate || !endDate) {
-      return res.status(400).json({ error: 'startDate and endDate are required query parameters' });
-    }
-
     const db = await connectToDatabase();
 
-    const startYear = parseInt(startDate.split('-')[0]);
-    const startMonth = parseInt(startDate.split('-')[1]);
-    const endYear = parseInt(endDate.split('-')[0]);
-    const endMonth = parseInt(endDate.split('-')[1]);
+    let tableNames = [];
 
-    const tableNames = [];
-    for (let year = startYear; year <= endYear; year++) {
-      const startM = (year === startYear) ? startMonth : 1;
-      const endM = (year === endYear) ? endMonth : 12;
+    if (startDate && endDate) {
+      const startYear = parseInt(startDate.split('-')[0]);
+      const startMonth = parseInt(startDate.split('-')[1]);
+      const endYear = parseInt(endDate.split('-')[0]);
+      const endMonth = parseInt(endDate.split('-')[1]);
 
-      for (let month = startM; month <= endM; month++) {
-        const formattedMonth = month < 10 ? `0${month}` : `${month}`;
-        tableNames.push(`RS_${year}_${formattedMonth}`);
+      for (let year = startYear; year <= endYear; year++) {
+        const startM = (year === startYear) ? startMonth : 1;
+        const endM = (year === endYear) ? endMonth : 12;
+
+        for (let month = startM; month <= endM; month++) {
+          const formattedMonth = month < 10 ? `0${month}` : `${month}`;
+          tableNames.push(`rs_${year}_${formattedMonth}`);
+        }
       }
+    } else {
+      // Fetch all table names that start with 'rs_'
+      const result = await db.query("SELECT tablename FROM pg_tables WHERE tablename LIKE 'rs_%'");
+      tableNames = result.rows.map(row => row.tablename);
+    }
+
+    if (tableNames.length === 0) {
+      return res.status(404).json({ error: 'No tables found for the given date range' });
     }
 
     // Construct the UNION ALL query to fetch data from all tables

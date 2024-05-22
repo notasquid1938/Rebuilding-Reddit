@@ -9,31 +9,36 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Query parameter "query" is required' });
   }
 
-  let client; // Define client variable outside try block
+  let client;
 
   try {
     const pool = await connectToDatabase();
-    client = await pool.connect(); // Assign client inside try block
+    client = await pool.connect();
 
-    // Base SQL query
+    // Base SQL query with similarity and length considerations
     let selectQuery = `
       SELECT subreddit
       FROM subreddits
       WHERE subreddit ILIKE $1 || '%'  -- Match subreddit names starting with the query
+      ORDER BY similarity(subreddit, $1) DESC, LENGTH(subreddit)
+      LIMIT 5
     `;
 
     // Append date range conditionally
     if (startDate && endDate) {
-      selectQuery += `
+      selectQuery = `
+        SELECT subreddit
+        FROM subreddits
+        WHERE subreddit ILIKE $1 || '%'  -- Match subreddit names starting with the query
         AND EXISTS (
           SELECT 1
           FROM unnest(found_in_tables) AS found_in_table
           WHERE to_date(found_in_table, 'YYYY_MM') BETWEEN to_date($2, 'YYYY_MM') AND to_date($3, 'YYYY_MM')
         )
+        ORDER BY similarity(subreddit, $1) DESC, LENGTH(subreddit)
+        LIMIT 5
       `;
     }
-
-    selectQuery += 'LIMIT 5';
 
     // Execute query with or without date parameters
     const result = startDate && endDate
@@ -48,7 +53,6 @@ export default async function handler(req, res) {
     console.error('Error fetching search suggestions:', error);
     res.status(500).json({ error: 'Internal server error' });
   } finally {
-    // Release the client back to the pool if it's defined
     if (client) {
       client.release();
     }
