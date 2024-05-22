@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styles from '../styles/Search.module.css';
 
-const Search = ({ onDateRangeChange, onSubredditChange}) => {
+const Search = ({ onDateRangeChange, onSubredditChange }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [subreddit, setSubreddit] = useState(''); 
@@ -43,11 +43,11 @@ const Search = ({ onDateRangeChange, onSubredditChange}) => {
     // Check if the input has text before making the API request
     if (inputValue.trim() === '') {
       setSuggestions([]);
-      setSubreddit('all')
+      setSubreddit('all');
       return;
     }
 
-    const response = await fetch(`/api/SearchSuggestions?query=${inputValue}`);
+    const response = await fetch(`/api/SearchSuggestions?query=${inputValue}&startDate=${startDate}&endDate=${endDate}`);
     const data = await response.json();
 
     setSuggestions(data.suggestions);
@@ -55,6 +55,7 @@ const Search = ({ onDateRangeChange, onSubredditChange}) => {
 
   const handleSuggestionClick = (suggestion) => {
     setQuery(suggestion);
+    setSubreddit(suggestion); // Update the subreddit state
     setSuggestions([]);
   };
 
