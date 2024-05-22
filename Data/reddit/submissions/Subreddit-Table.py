@@ -19,11 +19,12 @@ def get_unique_subreddits_and_tables(existing_tables):
         if table_name.startswith('rs'):
             cursor.execute(sql.SQL("SELECT DISTINCT subreddit FROM {}").format(sql.Identifier(table_name)))
             subreddits_in_table = [row[0] for row in cursor.fetchall()]
+            table_date = table_name[3:]  # Remove 'rs_' prefix
             for subreddit in subreddits_in_table:
                 if subreddit not in subreddits:
-                    subreddits[subreddit] = [table_name]
+                    subreddits[subreddit] = [table_date]
                 else:
-                    subreddits[subreddit].append(table_name)
+                    subreddits[subreddit].append(table_date)
     return subreddits
 
 # Function to create a new table for unique subreddit names and their dates
@@ -41,7 +42,7 @@ def create_subreddits_table(subreddits):
             INSERT INTO subreddits (subreddit, found_in_tables)
             VALUES (%s, %s)
             ON CONFLICT (subreddit) DO UPDATE
-            SET found_in_tables = subreddits.found_in_tables || EXCLUDED.found_in_tables;
+            SET found_in_tables = array(SELECT DISTINCT unnest(subreddits.found_in_tables || EXCLUDED.found_in_tables));
             """
             cursor.execute(insert_query, (subreddit, tables))
 
