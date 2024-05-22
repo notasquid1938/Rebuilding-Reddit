@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import Submissions from '../components/Submissions';
 import Search from '@/components/Search';
-import styles from '../styles/index.module.css'
+import styles from '../styles/index.module.css';
 
 function HomePage() {
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
@@ -10,44 +10,39 @@ function HomePage() {
   const [pageNumber, setPageNumber] = useState(1);
 
   useEffect(() => {
-    const savedStartDate = localStorage.getItem('startDate');
-    const savedEndDate = localStorage.getItem('endDate');
-    const savedSubreddit = localStorage.getItem('subreddit');
-    const savedPageNumber = localStorage.getItem('pageNumber');
+    sessionStorage.setItem('dateRange', JSON.stringify(dateRange));
+  }, [dateRange]);
 
-    if (savedStartDate && savedEndDate && savedSubreddit && savedPageNumber) {
-      setDateRange({ startDate: savedStartDate, endDate: savedEndDate });
-      setSubreddit(savedSubreddit);
-      setPageNumber(parseInt(savedPageNumber));
-    } else {
-      setDateRange({ startDate: '2008-12', endDate: '2008-12' });
-      setSubreddit('all');
-      setPageNumber(1);
-      localStorage.setItem('startDate', '2008-12');
-      localStorage.setItem('endDate', '2008-12');
-      localStorage.setItem('subreddit', 'all');
-      localStorage.setItem('pageNumber', '1');
-    }
-  }, []); 
+  useEffect(() => {
+    sessionStorage.setItem('subreddit', subreddit);
+  }, [subreddit]);
+
+  useEffect(() => {
+    sessionStorage.setItem('pageNumber', pageNumber.toString());
+  }, [pageNumber]);
+
+  useEffect(() => {
+    const savedDateRange = JSON.parse(sessionStorage.getItem('dateRange'));
+    const savedSubreddit = sessionStorage.getItem('subreddit');
+    const savedPageNumber = parseInt(sessionStorage.getItem('pageNumber'), 10);
+  
+    if (savedDateRange) setDateRange(savedDateRange);
+    if (savedSubreddit !== null) setSubreddit(savedSubreddit);
+    if (!isNaN(savedPageNumber)) setPageNumber(savedPageNumber);
+  }, []);  
 
   const handleDateRangeChange = (startDate, endDate) => {
     setDateRange({ startDate, endDate });
     setPageNumber(1);
-    localStorage.setItem('startDate', startDate);
-    localStorage.setItem('endDate', endDate);
-    localStorage.setItem('pageNumber', '1');
   };
 
   const handleSubredditChange = (selectedSubreddit) => {
     setSubreddit(selectedSubreddit);
     setPageNumber(1);
-    localStorage.setItem('subreddit', selectedSubreddit);
-    localStorage.setItem('pageNumber', '1');
   };
 
   const handlePageChange = (page) => {
     setPageNumber(page);
-    localStorage.setItem('pageNumber', page.toString());
   };
 
   return (
