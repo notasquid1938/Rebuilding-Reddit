@@ -1,4 +1,4 @@
-import { MeiliSearch } from 'meilisearch';
+import connectToDatabase from '../../db';
 
 export default async function handler(req, res) {
   const { query } = req.query;
@@ -7,18 +7,32 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Query parameter "query" is required' });
   }
 
-  const client = new MeiliSearch({
-    host: 'http://127.0.0.1:7700'
-    //apiKey: 'masterKey',
-  });
+  let client; // Define client variable outside try block
 
-  const index = client.index('subreddits');
+  try {
+    const pool = await connectToDatabase();
+    client = await pool.connect(); // Assign client inside try block
 
-  // Set the limit to 5 to get only the top 5 results
-  const searchResults = await index.search(query, { limit: 5 });
+    const selectQuery = `
+      SELECT subreddit
+      FROM subreddits
+      WHERE subreddit ILIKE $1 || '%'  -- Match subreddit names starting with the query
+      LIMIT 5
+    `;
 
-  // Extract only the subreddit names from the search results
-  const subredditNames = searchResults.hits.map(result => result.subreddit);
+    const result = await client.query(selectQuery, [query]);
 
-  res.status(200).json({ suggestions: subredditNames });
+    // Extract subreddit suggestions from the query result
+    const suggestions = result.rows.map(row => row.subreddit);
+
+    res.status(200).json({ suggestions });
+  } catch (error) {
+    console.error('Error fetching search suggestions:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    // Release the client back to the pool if it's defined
+    if (client) {
+      client.release();
+    }
+  }
 }

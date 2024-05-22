@@ -49,8 +49,8 @@ export default async function handler(req, res) {
 
     // Construct the main query
     let query = `SELECT * FROM (${unionQuery}) AS all_posts`;
-    if (subreddit && subreddit.toLowerCase() !== 'all') {
-      query += ` WHERE subreddit = '${subreddit.toLowerCase()}'`;
+    if (subreddit && subreddit !== 'all') {
+      query += ` WHERE subreddit = '${subreddit}'`; // Removed .toLowerCase()
     }
     query += ` ORDER BY score DESC LIMIT ${pageSize} OFFSET ${offset}`;
 
