@@ -153,7 +153,7 @@ def process_zst_file(zst_file, conn, cursor):
 
 def main():
     conn = psycopg2.connect(
-        dbname="Test-Database", #Reddit-Rebuilt
+        dbname="Reddit-Rebuilt", 
         user="Admin",
         password="Root",
         host="localhost"
