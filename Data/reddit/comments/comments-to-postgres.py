@@ -123,23 +123,37 @@ def process_zst_file(zst_file, conn, cursor):
     start_time = time.time()
     try:
         json_file = decompress_zst(zst_file)
-        table_name = create_table_and_load_data(cursor, conn, json_file)
-        create_indexes(cursor, conn, table_name)
-        os.remove(json_file)
-        print(f"Deleted JSON file: {json_file}")
-        end_time = time.time()
-        processing_time = end_time - start_time
-        return processing_time
+        table_name = os.path.splitext(os.path.basename(json_file))[0]
+
+        try:
+            create_table_and_load_data(cursor, conn, json_file)
+        except Exception as e:
+            print(f"Error during table creation and data loading for {zst_file}: {e}")
+        
+        try:
+            create_indexes(cursor, conn, table_name)
+        except Exception as e:
+            print(f"Error during index creation for {zst_file}: {e}")
+
+        try:
+            os.remove(json_file)
+            print(f"Deleted JSON file: {json_file}")
+        except OSError as e:
+            print(f"Error deleting JSON file {json_file}: {e}")
+
     except Exception as e:
-        conn.rollback()
         print(f"Error processing {zst_file}: {e}")
         if "No space left on device" in str(e):
             raise Exception("Storage space exhausted")
-        return None
+        
+    finally:
+        end_time = time.time()
+        processing_time = end_time - start_time
+        return processing_time
 
 def main():
     conn = psycopg2.connect(
-        dbname="Reddit-Rebuilt",
+        dbname="Test-Database", #Reddit-Rebuilt
         user="Admin",
         password="Root",
         host="localhost"
