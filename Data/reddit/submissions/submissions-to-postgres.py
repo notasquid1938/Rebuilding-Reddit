@@ -61,7 +61,7 @@ def create_table_and_load_data(cursor, conn, json_file):
 
     columns = list(sample_json.keys())
     column_definitions = [
-        f'"{column}" NUMERIC' if column in ['score', 'created_utc', 'ups', 'downs'] else f'"{column}" VARCHAR'
+        f'"{column}" NUMERIC' if column in ['score', 'created_utc'] else f'"{column}" VARCHAR'
         for column in columns
     ]
     column_definitions = ', '.join(column_definitions)
@@ -103,8 +103,8 @@ def create_table_and_load_data(cursor, conn, json_file):
 
 def create_indexes(cursor, conn, table_name):
     print(f"Creating indexes for {table_name}...")
-    index_columns = ['parent_id', 'link_id', 'score']
-    total_indexes = len(index_columns)
+    index_columns = ['score', 'id', 'subreddit']
+    total_indexes = len(index_columns) + 1  # +1 for composite index
     
     for i, column in enumerate(index_columns, 1):
         index_name = f'"{table_name}_{column}_index"'
@@ -115,6 +115,15 @@ def create_indexes(cursor, conn, table_name):
         except OperationalError as e:
             if "already exists" not in str(e):
                 print(f"Error creating index {index_name}: {e}")
+    
+    # Create composite index
+    try:
+        composite_index_name = f'"{table_name}_subreddit_score_index"'
+        cursor.execute(f"CREATE INDEX {composite_index_name} ON \"{table_name}\" (\"subreddit\" ASC, \"score\" DESC);")
+        print(f"Created composite index {total_indexes}/{total_indexes}: {composite_index_name}", end='\r')
+    except OperationalError as e:
+        if "already exists" not in str(e):
+            print(f"Error creating composite index {composite_index_name}: {e}")
     
     conn.commit()  # Commit the index creation
     print(f"\nIndex creation complete for {table_name}")
@@ -162,7 +171,7 @@ def main():
 
     try:
         current_dir = os.getcwd()
-        zst_files = [f for f in os.listdir(current_dir) if f.startswith("RC") and f.endswith(".zst")]
+        zst_files = [f for f in os.listdir(current_dir) if f.startswith("RS") and f.endswith(".zst")]
         
         with open('time.txt', 'a') as time_file:
             for i, zst_file in enumerate(zst_files, 1):
