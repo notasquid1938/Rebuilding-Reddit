@@ -5,7 +5,7 @@ import Search from '@/components/Search';
 import styles from '../styles/index.module.css';
 
 function SearchPage() {
-  const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
+  const [dateRange, setDateRange] = useState({ startDate: '2005-06', endDate: '2006-12' }); //Set for Testing
   const [subreddit, setSubreddit] = useState('');
   const [pageNumber, setPageNumber] = useState(1);
 
