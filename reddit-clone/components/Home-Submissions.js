@@ -6,7 +6,7 @@ import UpvoteIcon from '../public/upvote.svg';
 import DownvoteIcon from '../public/downvote.svg';
 import LoadingSpinner from './LoadingSpinner'; 
 
-const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
+const HomeSubmissions = ({ dateRange, subreddit, page, onPageChange }) => {
   const [posts, setPosts] = useState([]);
   const [currentPage, setCurrentPage] = useState(page);
   const [isLoading, setIsLoading] = useState(false); 
@@ -126,4 +126,4 @@ const Submissions = ({ dateRange, subreddit, page, onPageChange }) => {
   
 };
 
-export default Submissions;
+export default HomeSubmissions;

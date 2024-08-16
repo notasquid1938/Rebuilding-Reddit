@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
-import Submissions from '../components/Submissions';
+import HomePage from '../components/Home';
 import Search from '@/components/Search';
 import styles from '../styles/index.module.css';
 
-function HomePage() {
+function SearchPage() {
   const [dateRange, setDateRange] = useState({ startDate: '', endDate: '' });
   const [subreddit, setSubreddit] = useState('');
   const [pageNumber, setPageNumber] = useState(1);
@@ -55,9 +55,9 @@ function HomePage() {
       </Helmet>
       <p className={styles.Title}>Reddit Rebuilt</p>
       <Search onDateRangeChange={handleDateRangeChange} onSubredditChange={handleSubredditChange} />
-      <Submissions dateRange={dateRange} subreddit={subreddit} page={pageNumber} onPageChange={handlePageChange} />
+      <HomePage dateRange={dateRange} subreddit={subreddit} page={pageNumber} onPageChange={handlePageChange} />
     </div>
   );
 }
 
-export default HomePage;
+export default SearchPage;
