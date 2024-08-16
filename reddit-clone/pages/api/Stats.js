@@ -59,9 +59,9 @@ export default async function handler(req, res) {
       LIMIT 10
     `;
 
-    // Run EXPLAIN ANALYZE for the main query and save to logs
+    // Run EXPLAIN ANALYZE for the main query and capture log content
     const explainAnalyzeMain = await db.query(`EXPLAIN ANALYZE ${query}`);
-    logExplainAnalyze(explainAnalyzeMain.rows, 'Main Query');
+    let logContent = logExplainAnalyze(explainAnalyzeMain.rows, 'Main Query');
 
     // Execute the main query
     const { rows } = await db.query(query);
@@ -87,9 +87,13 @@ export default async function handler(req, res) {
       LIMIT 10
     `;
 
-    // Run EXPLAIN ANALYZE for the top users query and save to logs
+    // Run EXPLAIN ANALYZE for the top users query and capture log content
     const explainAnalyzeTopUsers = await db.query(`EXPLAIN ANALYZE ${topUsersQuery}`);
-    logExplainAnalyze(explainAnalyzeTopUsers.rows, 'Top Users Query');
+    logContent += logExplainAnalyze(explainAnalyzeTopUsers.rows, 'Top Users Query');
+
+    // Save the combined log content
+    const logPath = path.join(__dirname, '../../../../logs/stats-log.txt');
+    fs.writeFileSync(logPath, logContent, 'utf8');
 
     const topUsersResult = await db.query(topUsersQuery);
     const topUsers = topUsersResult.rows.map(row => ({
@@ -111,13 +115,11 @@ export default async function handler(req, res) {
   }
 }
 
-// Function to log EXPLAIN ANALYZE results to stats-log.txt
+
 function logExplainAnalyze(explainRows, queryName) {
-  const logPath = path.join(__dirname, '../../../../logs/stats-log.txt');
   const logContent = `
 [${new Date().toISOString()}] - ${queryName}
 ${explainRows.map(row => row['QUERY PLAN']).join('\n')}
 `;
-
-  fs.appendFileSync(logPath, logContent, 'utf8');
+  return logContent;
 }
