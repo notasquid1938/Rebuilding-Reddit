@@ -104,8 +104,8 @@ def create_table_and_load_data(cursor, conn, json_file):
 def create_indexes(cursor, conn, table_name):
     print(f"Creating indexes for {table_name}...")
     index_columns = ['score', 'id', 'subreddit']
-    total_indexes = len(index_columns) + 1  # +1 for composite index
-    
+    total_indexes = len(index_columns) + 3  # +3 for composite indexes
+
     for i, column in enumerate(index_columns, 1):
         index_name = f'"{table_name}_{column}_index"'
         index_type = 'DESC' if column == 'score' else 'ASC'
@@ -116,14 +116,38 @@ def create_indexes(cursor, conn, table_name):
             if "already exists" not in str(e):
                 print(f"Error creating index {index_name}: {e}")
     
-    # Create composite index
+    # Create composite index for subreddit and score
     try:
         composite_index_name = f'"{table_name}_subreddit_score_index"'
         cursor.execute(f"CREATE INDEX {composite_index_name} ON \"{table_name}\" (\"subreddit\" ASC, \"score\" DESC);")
-        print(f"Created composite index {total_indexes}/{total_indexes}: {composite_index_name}", end='\r')
+        print(f"Created composite index {total_indexes-2}/{total_indexes}: {composite_index_name}", end='\r')
     except OperationalError as e:
         if "already exists" not in str(e):
             print(f"Error creating composite index {composite_index_name}: {e}")
+    
+    # Create new composite index for subreddit and author
+    try:
+        composite_index_name = f'"{table_name}_subreddit_author_index"'
+        cursor.execute(f"CREATE INDEX {composite_index_name} ON \"{table_name}\" (\"subreddit\" ASC, \"author\" ASC);")
+        print(f"Created composite index {total_indexes-1}/{total_indexes}: {composite_index_name}", end='\r')
+    except OperationalError as e:
+        if "already exists" not in str(e):
+            print(f"Error creating composite index {composite_index_name}: {e}")
+    
+    # Add the new index from the provided script
+    try:
+        additional_index_name = f'"{table_name}_subreddit_author_idx"'
+        cursor.execute(sql.SQL("""
+            CREATE INDEX IF NOT EXISTS {index_name} 
+            ON {table_name} (subreddit, author);
+        """).format(
+            index_name=sql.Identifier(additional_index_name),
+            table_name=sql.Identifier(table_name)
+        ))
+        print(f"Created additional index {total_indexes}/{total_indexes}: {additional_index_name}", end='\r')
+    except OperationalError as e:
+        if "already exists" not in str(e):
+            print(f"Error creating additional index {additional_index_name}: {e}")
     
     conn.commit()  # Commit the index creation
     print(f"\nIndex creation complete for {table_name}")
@@ -180,11 +204,10 @@ def main():
                 if processing_time is not None:
                     time_entry = f"{datetime.now()}: {zst_file} - Processing time: {processing_time:.2f} seconds\n"
                     time_file.write(time_entry)
-                    print(time_entry.strip())
-        
-        print("Complete!")
-    except Exception as e:
-        print(f"Process stopped: {e}")
+                    print(time_entry)
+
+            print("Completed!")
+    
     finally:
         cursor.close()
         conn.close()

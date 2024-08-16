@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import connectToDatabase from '../../db';
 
 export default async function handler(req, res) {
@@ -6,7 +8,6 @@ export default async function handler(req, res) {
     const endDate = req.query.endDate;
     const subreddit = req.query.subreddit;
     const db = await connectToDatabase();
-
     let tableNames = [];
 
     if (startDate && endDate) {
@@ -14,11 +15,9 @@ export default async function handler(req, res) {
       const startMonth = parseInt(startDate.split('-')[1]);
       const endYear = parseInt(endDate.split('-')[0]);
       const endMonth = parseInt(endDate.split('-')[1]);
-
       for (let year = startYear; year <= endYear; year++) {
         const startM = (year === startYear) ? startMonth : 1;
         const endM = (year === endYear) ? endMonth : 12;
-
         for (let month = startM; month <= endM; month++) {
           const formattedMonth = month < 10 ? `0${month}` : `${month}`;
           tableNames.push(`rs_${year}_${formattedMonth}`);
@@ -35,76 +34,90 @@ export default async function handler(req, res) {
     }
 
     // Construct the UNION ALL query to fetch data from all tables
-    let unionQuery = '';
-    for (let i = 0; i < tableNames.length; i++) {
-      unionQuery += `SELECT author, subreddit FROM ${tableNames[i]}`;
-      if (i !== tableNames.length - 1) {
-        unionQuery += ' UNION ALL ';
-      }
-    }
+    let unionQuery = tableNames.map(tableName => 
+      `SELECT author, subreddit FROM ${tableName}`
+    ).join(' UNION ALL ');
 
     // Build the main query to fetch stats
-    let query = `SELECT 
-                    COUNT(*) AS total_posts, 
-                    COUNT(DISTINCT author) AS unique_users,
-                    COUNT(*) FILTER (WHERE subreddit = '${subreddit}') AS subreddit_posts,
-                    subreddit,
-                    author
-                 FROM (${unionQuery}) AS all_posts`;
-    
+    let query = `
+      WITH all_posts AS (${unionQuery})
+      SELECT
+        COUNT(*) AS total_posts,
+        COUNT(DISTINCT author) AS unique_users,
+        subreddit,
+        COUNT(*) AS subreddit_posts
+      FROM all_posts
+    `;
+
     if (subreddit && subreddit !== 'all') {
       query += ` WHERE subreddit = '${subreddit}'`;
     }
-    
-    query += ` GROUP BY subreddit, author`;
+
+    query += `
+      GROUP BY subreddit
+      ORDER BY subreddit_posts DESC
+      LIMIT 10
+    `;
+
+    // Run EXPLAIN ANALYZE for the main query and save to logs
+    const explainAnalyzeMain = await db.query(`EXPLAIN ANALYZE ${query}`);
+    logExplainAnalyze(explainAnalyzeMain.rows, 'Main Query');
 
     // Execute the main query
     const { rows } = await db.query(query);
 
     // Extract the required stats
-    const totalPosts = rows.reduce((acc, row) => acc + parseInt(row.total_posts), 0);
-    const uniqueUsers = rows.reduce((acc, row) => acc + parseInt(row.unique_users), 0);
+    const totalPosts = rows.reduce((acc, row) => acc + parseInt(row.subreddit_posts), 0);
+    const uniqueUsers = parseInt(rows[0].unique_users);
 
-    // Calculate top 10 subreddits and top 10 users by post count
-    const topSubreddits = rows
-      .reduce((acc, row) => {
-        if (!acc[row.subreddit]) {
-          acc[row.subreddit] = parseInt(row.subreddit_posts);
-        } else {
-          acc[row.subreddit] += parseInt(row.subreddit_posts);
-        }
-        return acc;
-      }, {});
+    // Top 10 subreddits are already sorted by the SQL query
+    const topSubreddits = rows.map(row => ({
+      subreddit: row.subreddit,
+      posts: parseInt(row.subreddit_posts)
+    }));
 
-    const topUsers = rows
-      .reduce((acc, row) => {
-        if (!acc[row.author]) {
-          acc[row.author] = parseInt(row.total_posts);
-        } else {
-          acc[row.author] += parseInt(row.total_posts);
-        }
-        return acc;
-      }, {});
+    // For top users, we need a separate query
+    const topUsersQuery = `
+      WITH all_posts AS (${unionQuery})
+      SELECT author, COUNT(*) as post_count
+      FROM all_posts
+      ${subreddit && subreddit !== 'all' ? `WHERE subreddit = '${subreddit}'` : ''}
+      GROUP BY author
+      ORDER BY post_count DESC
+      LIMIT 10
+    `;
 
-    const sortedTopSubreddits = Object.entries(topSubreddits)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(entry => ({ subreddit: entry[0], posts: entry[1] }));
+    // Run EXPLAIN ANALYZE for the top users query and save to logs
+    const explainAnalyzeTopUsers = await db.query(`EXPLAIN ANALYZE ${topUsersQuery}`);
+    logExplainAnalyze(explainAnalyzeTopUsers.rows, 'Top Users Query');
 
-    const sortedTopUsers = Object.entries(topUsers)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(entry => ({ user: entry[0], posts: entry[1] }));
+    const topUsersResult = await db.query(topUsersQuery);
+    const topUsers = topUsersResult.rows.map(row => ({
+      user: row.author,
+      posts: parseInt(row.post_count)
+    }));
 
     // Send the stats in the response
     res.status(200).json({
       totalPosts,
       uniqueUsers,
-      topSubreddits: sortedTopSubreddits,
-      topUsers: sortedTopUsers
+      topSubreddits,
+      topUsers
     });
+
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
+}
+
+// Function to log EXPLAIN ANALYZE results to stats-log.txt
+function logExplainAnalyze(explainRows, queryName) {
+  const logPath = path.join(__dirname, '../../../../logs/stats-log.txt');
+  const logContent = `
+[${new Date().toISOString()}] - ${queryName}
+${explainRows.map(row => row['QUERY PLAN']).join('\n')}
+`;
+
+  fs.appendFileSync(logPath, logContent, 'utf8');
 }

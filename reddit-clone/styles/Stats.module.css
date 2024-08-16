@@ -1,3 +1,10 @@
 .Title {
     text-align: center;
 }
+
+.subredditImage {
+    height: 3vmin;
+    width: 3vmin;
+    margin-right: 0.5vmin;
+    border-radius: 4vmin;
+  }

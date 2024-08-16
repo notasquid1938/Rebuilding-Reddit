@@ -12,7 +12,6 @@ const Stats = ({ dateRange, subreddit }) => {
             setIsLoading(true);
             try {
                 const response = await axios.get(`/api/Stats?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&subreddit=${subreddit}`);
-                console.log('Response Data:', response.data); // Log the response data
                 setStats(response.data);
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -37,20 +36,27 @@ const Stats = ({ dateRange, subreddit }) => {
                     
                     <div>
                         <p><strong>Top 10 Subreddits by Posts:</strong></p>
-                        <ul>
+                        <ol>
                             {stats.topSubreddits.map((subreddit, index) => (
-                                <li key={index}>{subreddit.subreddit}: {subreddit.posts} posts</li>
+                                <li key={index}>
+                                    <img
+                                        src={`/api/SubredditIcons?subreddit=${subreddit.subreddit}`}
+                                        alt={`${subreddit.subreddit} icon`}
+                                        className={styles.subredditImage}
+                                    />
+                                    r/{subreddit.subreddit}: {subreddit.posts}
+                                </li>
                             ))}
-                        </ul>
+                        </ol>
                     </div>
 
                     <div>
                         <p><strong>Top 10 Users by Posts:</strong></p>
-                        <ul>
+                        <ol>
                             {stats.topUsers.map((user, index) => (
-                                <li key={index}>{user.user}: {user.posts} posts</li>
+                                <li key={index}>u/{user.user}: {user.posts}</li>
                             ))}
-                        </ul>
+                        </ol>
                     </div>
                 </div>
             )}
