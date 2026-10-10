@@ -1,0 +1,126 @@
+/* ---------- Community banner ---------- */
+.bannerWrap {
+  max-width: 1088px;
+  margin: 8px auto 0;
+}
+
+.banner {
+  height: 128px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 15% 120%, rgba(255, 255, 255, 0.18) 0 60px, transparent 61px),
+    radial-gradient(circle at 85% -20%, rgba(255, 255, 255, 0.14) 0 90px, transparent 91px),
+    linear-gradient(120deg, #FF4500 0%, #FF6A2B 45%, #FF8717 100%);
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 0 16px;
+  margin-top: -40px;
+}
+
+.bigIcon {
+  border: 4px solid var(--bg);
+  background: var(--bg);
+}
+
+.headerText {
+  min-width: 0;
+}
+
+.headerRow .headerText {
+  padding-top: 46px;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 36px;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.headerSub {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-weak);
+}
+
+/* ---------- User profile ---------- */
+.userHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0 16px;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  color: var(--text-weak);
+}
+
+.tabActive {
+  background: var(--bg-secondary);
+  color: var(--text-strong);
+}
+
+.tabDisabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.notice {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--text-weak);
+}
+
+@media (max-width: 640px) {
+  .banner {
+    height: 72px;
+  }
+
+  .headerRow {
+    margin-top: -24px;
+  }
+
+  .headerRow .headerText {
+    padding-top: 28px;
+  }
+
+  .bigIcon {
+    width: 56px;
+    height: 56px;
+  }
+
+  .headerTitle {
+    font-size: 22px;
+    line-height: 28px;
+  }
+}
+
+.banner {
+  position: relative;
+  overflow: hidden;
+}
+
+.bannerImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

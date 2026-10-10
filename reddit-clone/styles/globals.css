@@ -1,16 +1,87 @@
+/* Design tokens modelled on Reddit's current (2024+) interface */
 :root {
-  --reddit-orange: rgb(255, 69, 0);
-  --reddit-darker-orange: rgba(255, 68, 0, 0.85);
-  --text-color: rgb(242,242,223);
+  --font-sans: var(--font-reddit-sans, 'Reddit Sans'), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  --brand: #FF4500;
+  --upvote: #D93A00;
+  --downvote: #6A5CFF;
+  --link: #0045AC;
+  --button-primary: #0A449B;
+  --button-primary-hover: #0A3C88;
+
+  --bg: #FFFFFF;
+  --bg-hover: #F6F8F9;
+  --bg-weak: #F2F4F5;
+  --bg-secondary: #E5EBEE;
+  --bg-secondary-hover: #D2DADD;
+  --bg-elevated: #FFFFFF;
+  --bg-sidebar-card: #F6F8F9;
+
+  --text-strong: #0F1A1C;
+  --text: #2A3C42;
+  --text-weak: #576F76;
+  --text-weaker: #8BA2AD;
+
+  --border: #0000001A;
+  --border-strong: #00000033;
+  --divider: #0000001A;
+  --focus: #0A449B;
+
+  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  --header-height: 56px;
+  --left-nav-width: 272px;
+  --radius-pill: 999px;
+  --radius-card: 16px;
+
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --upvote: #FF4500;
+  --downvote: #8B80FF;
+  --link: #648EFC;
+  --button-primary: #115BCA;
+  --button-primary-hover: #1870F4;
+
+  --bg: #0E1113;
+  --bg-hover: #181C1F;
+  --bg-weak: #14181A;
+  --bg-secondary: #2A3236;
+  --bg-secondary-hover: #333D42;
+  --bg-elevated: #181C1F;
+  --bg-sidebar-card: #04090A;
+
+  --text-strong: #EEF1F3;
+  --text: #D7DADC;
+  --text-weak: #8BA2AD;
+  --text-weaker: #6C8189;
+
+  --border: #FFFFFF1A;
+  --border-strong: #FFFFFF33;
+  --divider: #FFFFFF1F;
+  --focus: #648EFC;
+
+  --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 html,
 body {
-  background-color: rgb(11,20,22);
-  padding: 0;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.43;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
@@ -18,16 +89,81 @@ a {
   text-decoration: none;
 }
 
-* {
-  box-sizing: border-box;
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-  body {
-    color: rgb(236,244,245);
-    background: rgb(11,20,22);
-  }
+button {
+  cursor: pointer;
 }
+
+img {
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--divider);
+  margin: 0;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Rendered Reddit markdown (posts and comments) */
+.md {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md p { margin: 0 0 12px; }
+.md a { color: var(--link); text-decoration: underline; }
+.md a:hover { text-decoration: none; }
+.md blockquote {
+  margin: 0 0 12px;
+  padding: 0 0 0 12px;
+  border-left: 4px solid var(--bg-secondary);
+  color: var(--text-weak);
+}
+.md ul, .md ol { margin: 0 0 12px; padding-left: 24px; }
+.md li { margin: 4px 0; }
+.md code {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+.md pre {
+  background: var(--bg-weak);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+}
+.md pre code { background: none; padding: 0; }
+.md table { border-collapse: collapse; margin: 0 0 12px; display: block; overflow-x: auto; }
+.md th, .md td { border: 1px solid var(--border); padding: 4px 8px; }
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { color: var(--text-strong); margin: 16px 0 8px; line-height: 1.3; }
+.md h1 { font-size: 20px; }
+.md h2 { font-size: 18px; }
+.md h3, .md h4, .md h5, .md h6 { font-size: 16px; }
+.md hr { margin: 16px 0; }
+.md del { color: var(--text-weak); }

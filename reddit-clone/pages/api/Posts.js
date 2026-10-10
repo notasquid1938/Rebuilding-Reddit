@@ -1,83 +1,47 @@
-import fs from 'fs';
-import path from 'path';
-import connectToDatabase from '../../db';
-
-// Define the columns to select from each table
-const selectedColumns = ['author', 'created_utc', 'score', 'id', 'subreddit', 'title', 'url'];
+import { checkRateLimit, getClientIp } from '../../middleware/rateLimit';
+import { queryPosts, resolveSubreddit, isMonth, SUBREDDIT_RE, AUTHOR_RE } from '@/lib/submissions';
 
 export default async function handler(req, res) {
+  const ip = getClientIp(req);
+  if (!checkRateLimit(req, ip, 100, 60000)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
   try {
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    const subreddit = req.query.subreddit;
-    const page = req.query.page || 1;
-    const pageSize = 10;
-    const offset = (page - 1) * pageSize;
+    const { startDate, endDate, author } = req.query;
+    let { subreddit } = req.query;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+    const sort = req.query.sort === 'new' ? 'new' : 'top';
 
-    const db = await connectToDatabase();
-
-    let tableNames = [];
-
-    if (startDate && endDate) {
-      const startYear = parseInt(startDate.split('-')[0]);
-      const startMonth = parseInt(startDate.split('-')[1]);
-      const endYear = parseInt(endDate.split('-')[0]);
-      const endMonth = parseInt(endDate.split('-')[1]);
-
-      for (let year = startYear; year <= endYear; year++) {
-        const startM = (year === startYear) ? startMonth : 1;
-        const endM = (year === endYear) ? endMonth : 12;
-
-        for (let month = startM; month <= endM; month++) {
-          const formattedMonth = month < 10 ? `0${month}` : `${month}`;
-          tableNames.push(`rs_${year}_${formattedMonth}`);
-        }
-      }
-    } else {
-      // Fetch all table names that start with 'rs_'
-      const result = await db.query("SELECT tablename FROM pg_tables WHERE tablename LIKE 'rs_%'");
-      tableNames = result.rows.map(row => row.tablename);
+    if (page < 1 || page > 10000) return res.status(400).json({ error: 'Invalid page' });
+    if ((startDate && !isMonth(startDate)) || (endDate && !isMonth(endDate))) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM' });
     }
+    if (author && !AUTHOR_RE.test(author)) return res.status(400).json({ error: 'Invalid author' });
+    if (subreddit === 'all' || subreddit === '') subreddit = undefined;
+    if (subreddit && !SUBREDDIT_RE.test(subreddit)) return res.status(400).json({ error: 'Invalid subreddit' });
+    // Sorting by date needs the (author, created_utc) index; other feeds are Top only.
+    if (sort === 'new' && !author) return res.status(400).json({ error: 'sort=new requires author' });
 
-    if (tableNames.length === 0) {
-      return res.status(404).json({ error: 'No tables found for the given date range' });
-    }
+    if (subreddit) subreddit = await resolveSubreddit(subreddit);
 
-    // Construct the UNION ALL query to fetch data from all tables
-    let unionQuery = '';
-    for (let i = 0; i < tableNames.length; i++) {
-      // Construct the SELECT statement with selected columns
-      const columnsToSelect = selectedColumns.map(col => `${col}`);
-      unionQuery += `SELECT ${columnsToSelect.join(',')} FROM ${tableNames[i]}`;
-      if (i !== tableNames.length - 1) {
-        unionQuery += ' UNION ALL ';
-      }
-    }
-
-    // Construct the main query
-    let query = `SELECT * FROM (${unionQuery}) AS all_posts`;
-    if (subreddit && subreddit !== 'all') {
-      query += ` WHERE subreddit = '${subreddit}'`; // Removed .toLowerCase()
-    }
-    query += ` ORDER BY score DESC LIMIT ${pageSize} OFFSET ${offset}`;
-
-    // Write the query to the log file
-    const logFilePath = path.join(__dirname, '../../../../logs/posts-log.txt');
-    fs.writeFileSync(logFilePath, `${query}\n`, { flag: 'w' });
-
-    const explainQuery = `EXPLAIN (ANALYZE, COSTS, FORMAT JSON) ${query}`;
-
-    // Execute the explain query
-    const explainResult = await db.query(explainQuery);
-
-    // Append the explain results to the log file
-    fs.writeFileSync(logFilePath, JSON.stringify(explainResult.rows) + '\n', { flag: 'a' });
-
-    // Execute the main query
-    const { rows } = await db.query(query);
-    res.status(200).json(rows);
+    const posts = await queryPosts({
+      startDate,
+      endDate,
+      subreddit,
+      author,
+      sort,
+      limit,
+      offset: (page - 1) * limit,
+    });
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.status(200).json(posts);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error fetching posts:', error.message);
+    const timedOut = error.code === '57014';
+    res.status(timedOut ? 504 : 500).json({
+      error: timedOut ? 'This feed took too long to load. Try a narrower date range or a different sort.' : 'Server Error',
+    });
   }
 }

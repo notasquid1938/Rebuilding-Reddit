@@ -1,40 +1,60 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Reddit Rebuilt — web app
 
-## Getting Started
+A [Next.js](https://nextjs.org/) (Pages Router) site that serves the Pushshift Reddit dumps from PostgreSQL with an interface modelled on Reddit's current design: top bar with community search, left navigation, card feed, community and user pages, threaded comments and a dark mode.
 
-First, run the development server:
+## Running with Docker
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+docker compose up -d --build   # site on http://localhost:3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Three services:
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+- **db**: Postgres. Months loaded by the loader go into the `archive_hdd` tablespace, mounted from `../pg_archive`. Point that mount at whichever disk has room.
+- **loader**: keeps the archive complete. Each cycle (every `REFRESH_HOURS`) it:
+  1. downloads any monthly dump that is neither on disk nor loaded (`fetch_dumps.py`). The month list is read from [Arctic Shift's download links](https://github.com/ArthurHeitmann/arctic_shift/blob/master/download_links.md), so newly published months are picked up automatically;
+  2. loads each `RS_`/`RC_YYYY-MM.zst` into `rs_`/`rc_YYYY_MM` (`dump_loader.py`). It streams from zstd, COPYs into a staging table, isolates bad rows, builds indexes, then swaps the table in, so the site never sees a half-loaded month. Progress lives in the `loader_state` table, so an interrupted run resumes;
+  3. refreshes the lookup tables the site reads (`scripts/site_tables.sql`, `scripts/build_subreddit_metadata.sql`);
+  4. loads subreddit about pages (title, description, members, icon/banner URLs) from the Arctic Shift subreddit snapshots (`subreddits_loader.py`) and downloads icons into `Data/reddit/icons` (`scrape_icons.py`). Icons are append-only: an icon on disk is never replaced, so communities deleted from Reddit keep theirs.
+- **reddit-clone**: the website.
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.js`.
+Loader settings (in `docker-compose.yml`):
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `LOADER_COLUMNS` | `site` | `site` keeps the fields the website shows (about a third of the size); `all` keeps every field |
+| `LOAD_COMMENTS` | `0` | Comments add roughly 9 TB (site columns) through 2026. Set to `1` once there's room |
+| `DELETE_LOADED_DUMPS` | `comments` | Delete those `.zst` dumps after a load with zero skipped rows |
+| `LOADER_WORKERS` | `4` | Months loaded in parallel |
+| `LOADER_TABLESPACE` | `archive_hdd` | Tablespace for newly loaded months |
+| `REFRESH_HOURS` | `24` | How often to look for newly published months |
+| `ICON_RATE` | `20` | Icon downloads per second |
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+Website settings:
 
-## Learn More
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `POSTGRES_URL` | `postgres://postgres:postgres@localhost:5432/Reddit-Rebuilt` | Database connection |
+| `DATA_DIR` | `../Data` | Subreddit icons (`reddit/icons/`) and Imgur images (`imgur/images/<id>.<ext>`) |
+| `SITE_URL` | `https://redditrebuilt.com` | Absolute URLs in sitemaps and canonical links |
 
-To learn more about Next.js, take a look at the following resources:
+## Database maintenance
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The loader creates all indexes and lookup tables itself. For months loaded by older versions of the loader:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+```bash
+docker exec -i reddit-rebuilt-db psql -U postgres -d Reddit-Rebuilt < scripts/build_indexes.sql
+cat scripts/site_tables.sql scripts/build_subreddit_metadata.sql | \
+  docker exec -i reddit-rebuilt-db psql -U postgres -d Reddit-Rebuilt -v ON_ERROR_STOP=1
+```
 
-## Deploy on Vercel
+## Development
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm install
+POSTGRES_URL=postgres://postgres:postgres@<db-host>:5432/Reddit-Rebuilt npm run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+## Reddit-style URLs
+
+Paths copied from reddit.com work as-is: `/r/<sub>/comments/<id>/<slug>`, `/comments/<id>`, `/u/<name>` and `/user/<name>` are rewritten to the archived thread or user page.

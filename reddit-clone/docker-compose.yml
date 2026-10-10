@@ -1,0 +1,114 @@
+version: '3.8'
+
+services:
+  reddit-clone:
+    container_name: reddit-rebuilt-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - POSTGRES_URL=postgres://postgres:postgres@db:5432/Reddit-Rebuilt
+      - NODE_ENV=production
+      - DATA_DIR=/Data
+      - SITE_URL=https://redditrebuilt.com
+    volumes:
+      - ../Data:/Data:ro 
+    depends_on:
+      - db
+    networks:
+      - reddit-net
+    # LIMIT LOGGING HERE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    image: postgres:15-alpine
+    container_name: reddit-rebuilt-db
+    restart: always
+    shm_size: 1g
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: Reddit-Rebuilt
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Bulk archive tablespace (newer months); point at whichever disk has room
+      - ../pg_archive:/var/lib/postgresql/tablespaces/archive
+    networks:
+      - reddit-net
+    # LIMIT LOGGING HERE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # The tablespace directory must exist and belong to postgres before startup
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        mkdir -p /var/lib/postgresql/tablespaces/archive/data &&
+        chown postgres:postgres /var/lib/postgresql/tablespaces/archive/data &&
+        chmod 700 /var/lib/postgresql/tablespaces/archive/data &&
+        exec docker-entrypoint.sh "$$@"
+      - sh
+    # Quiet logs ("stop the screaming"); wal_level=minimal lets the loader make
+    # bulk-loaded tables durable without writing them to WAL twice
+    command: >-
+      postgres
+      -c log_statement=none -c log_min_error_statement=fatal
+      -c wal_level=minimal -c max_wal_senders=0
+      -c shared_buffers=4GB -c effective_cache_size=24GB
+      -c work_mem=32MB -c maintenance_work_mem=1GB
+      -c max_wal_size=8GB -c checkpoint_timeout=15min
+      -c random_page_cost=1.1 -c effective_io_concurrency=64
+
+  loader:
+    container_name: reddit-data-loader
+    build:
+      context: .
+      dockerfile: Dockerfile.loader
+    restart: unless-stopped
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=Reddit-Rebuilt
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - DATA_DIR=/data
+      # site = only the fields the website shows (~3x smaller than every field)
+      - LOADER_COLUMNS=site
+      - LOADER_WORKERS=4
+      # New months go to the archive tablespace (see the db volumes)
+      - LOADER_TABLESPACE=archive_hdd
+      - TABLESPACE_LOCATION=/var/lib/postgresql/tablespaces/archive/data
+      # Comments need ~9 TB more than posts; set to 1 once there is room
+      - LOAD_COMMENTS=0
+      # Delete RC_*.zst after a load with zero skipped rows
+      - DELETE_LOADED_DUMPS=comments
+      # Check for newly published months daily
+      - REFRESH_HOURS=24
+      - ICON_RATE=20
+    volumes:
+      - ../Data:/data
+    depends_on:
+      - db
+    networks:
+      - reddit-net
+    # LIMIT LOGGING HERE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+
+networks:
+  reddit-net:

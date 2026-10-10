@@ -1,0 +1,27 @@
+FROM python:3.12-slim
+
+# System dependencies:
+# - zstd: streams the dumps
+# - postgresql-client: psql, for the SQL scripts in scripts/
+# - netcat-openbsd: waits for the database
+# - aria2: downloads the dump torrents
+# - wget: fetches .torrent files
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    zstd \
+    postgresql-client \
+    netcat-openbsd \
+    aria2 \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir psycopg2-binary requests
+
+COPY dump_loader.py fetch_dumps.py subreddits_loader.py scrape_icons.py entrypoint-loader.sh ./
+COPY scripts ./scripts
+
+RUN chmod +x entrypoint-loader.sh
+
+CMD ["./entrypoint-loader.sh"]

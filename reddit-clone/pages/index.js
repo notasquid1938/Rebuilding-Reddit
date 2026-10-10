@@ -1,63 +1,50 @@
-import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
-import HomePage from '../components/Home';
-import Search from '@/components/Search';
-import styles from '../styles/index.module.css';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
+import Layout from '@/components/Layout';
+import Feed from '@/components/Feed';
+import FeedControls from '@/components/FeedControls';
+import { PostSkeleton } from '@/components/PostCard';
+import { AboutArchiveCard, TopCommunitiesCard, SidebarFooter } from '@/components/Sidebar';
+import { DEFAULT_RANGE, SITE_NAME } from '@/lib/site';
+import { monthLabel } from '@/lib/format';
+import { rangeFromQuery, rangeToQuery } from '@/lib/range';
 
-function SearchPage() {
-  const [dateRange, setDateRange] = useState({ startDate: '2005-06', endDate: '2006-12' }); //Set for Testing
-  const [subreddit, setSubreddit] = useState('');
-  const [pageNumber, setPageNumber] = useState(1);
-
-  useEffect(() => {
-    sessionStorage.setItem('dateRange', JSON.stringify(dateRange));
-  }, [dateRange]);
-
-  useEffect(() => {
-    sessionStorage.setItem('subreddit', subreddit);
-  }, [subreddit]);
-
-  useEffect(() => {
-    sessionStorage.setItem('pageNumber', pageNumber.toString());
-  }, [pageNumber]);
-
-  useEffect(() => {
-    const savedDateRange = JSON.parse(sessionStorage.getItem('dateRange'));
-    const savedSubreddit = sessionStorage.getItem('subreddit');
-    const savedPageNumber = parseInt(sessionStorage.getItem('pageNumber'), 10);
-  
-    if (savedDateRange) setDateRange(savedDateRange);
-    if (savedSubreddit !== null) setSubreddit(savedSubreddit);
-    if (!isNaN(savedPageNumber)) setPageNumber(savedPageNumber);
-  }, []);  
-
-  const handleDateRangeChange = (startDate, endDate) => {
-    setDateRange({ startDate, endDate });
-    setPageNumber(1);
-  };
-
-  const handleSubredditChange = (selectedSubreddit) => {
-    setSubreddit(selectedSubreddit);
-    setPageNumber(1);
-  };
-
-  const handlePageChange = (page) => {
-    setPageNumber(page);
-  };
+function HomePage() {
+  const router = useRouter();
+  const range = router.isReady ? rangeFromQuery(router.query, DEFAULT_RANGE) : DEFAULT_RANGE;
+  const feedQuery = { startDate: range?.from, endDate: range?.to, sort: 'top' };
+  const rangeTitle = range ? `${monthLabel(range.from)} – ${monthLabel(range.to)}` : 'All time';
 
   return (
-    <div>
-      <Helmet htmlAttributes={{ lang: 'en' }}>
-        <title>Reddit - Dive into anything</title>
-        <meta name="description" content="A website for archiving old Reddit Posts" />
-        <link rel="icon" type="image/png" href="../favicon.png"></link>
-        <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
-      </Helmet>
-      <p className={styles.Title}>Reddit Rebuilt</p>
-      <Search onDateRangeChange={handleDateRangeChange} onSubredditChange={handleSubredditChange} />
-      <HomePage dateRange={dateRange} subreddit={subreddit} page={pageNumber} onPageChange={handlePageChange} />
-    </div>
+    <Layout
+      sidebar={
+        <>
+          <AboutArchiveCard />
+          <TopCommunitiesCard from={range?.from} to={range?.to} title={`Top communities · ${rangeTitle}`} />
+          <SidebarFooter />
+        </>
+      }
+    >
+      <Head>
+        <title>{`${SITE_NAME} - Dive into Reddit's history`}</title>
+        <meta name="description" content="A website for archiving and exploring old Reddit posts from 2005 onwards" />
+        <meta property="og:title" content={SITE_NAME} />
+        <meta property="og:description" content="Browse the top Reddit posts of any month since 2005." />
+      </Head>
+
+      <FeedControls
+        sort="top"
+        range={range}
+        onRangeChange={(next) => router.push({ pathname: '/', query: rangeToQuery(next) })}
+      />
+      <hr />
+      {router.isReady ? (
+        <Feed key={JSON.stringify(feedQuery)} query={feedQuery} />
+      ) : (
+        <PostSkeleton />
+      )}
+    </Layout>
   );
 }
 
-export default SearchPage;
+export default HomePage;

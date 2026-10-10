@@ -1,24 +1,28 @@
-import connectToDatabase from "@/db";
+import { checkRateLimit, getClientIp } from '../../middleware/rateLimit';
+import { getSubmissionTables } from '@/lib/submissions';
 
 export default async function handler(req, res) {
+  // Rate limiting
+  const ip = getClientIp(req);
+  if (!checkRateLimit(req, ip, 100, 60000)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
   try {
-    const db = await connectToDatabase();
-    
-    // Query to fetch table names starting with 'RS'
-    const query = `
-      SELECT table_name
-      FROM information_schema.tables
-      WHERE table_catalog = 'Reddit-Rebuilt'
-      AND table_schema = 'public'
-      AND table_name LIKE 'rs%';
-    `;
+    // Only months whose table actually holds data (getSubmissionTables caches for 5 minutes)
+    const tables = await getSubmissionTables();
 
-    const result = await db.query(query);
-    const rsCollections = result.rows.map(row => row.table_name.replace(/^rs_/, '').replace(/_/g, '-'));
+    if (tables.length === 0) {
+      return res.status(404).json({ error: 'No date collections found' });
+    }
 
-    res.status(200).json({ collections: rsCollections });
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    res.status(200).json({ collections: tables.map((t) => t.month) });
   } catch (error) {
     console.error('Error fetching available dates:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 }
