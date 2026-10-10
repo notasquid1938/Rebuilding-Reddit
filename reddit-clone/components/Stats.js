@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from "axios";
 import styles from '@/styles/Stats.module.css';
 import LoadingSpinner from "./LoadingSpinner";
 
@@ -11,8 +10,9 @@ const Stats = ({ dateRange, subreddit }) => {
         const fetchStats = async () => {
             setIsLoading(true);
             try {
-                const response = await axios.get(`/api/Stats?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&subreddit=${subreddit}`);
-                setStats(response.data);
+                const response = await fetch(`/api/Stats?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&subreddit=${subreddit}`);
+                if (!response.ok) throw new Error(`Stats request failed (${response.status})`);
+                setStats(await response.json());
             } catch (error) {
                 console.error('Error fetching data:', error);
             } finally {

@@ -1,0 +1,117 @@
+.post {
+  padding: 0 0 8px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  margin-right: 4px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-strong);
+}
+
+.backButton:hover {
+  background: var(--bg-secondary-hover);
+}
+
+.metaText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-weak);
+}
+
+.metaTop {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.community {
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.community:hover {
+  color: var(--link);
+}
+
+.author {
+  color: var(--text-weak);
+}
+
+a.author:hover {
+  color: var(--link);
+}
+
+.dot {
+  margin: 0 2px;
+}
+
+.titleRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.titleBlock {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 30px;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.body {
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.removed {
+  margin: 12px 0;
+  color: var(--text-weak);
+  font-style: italic;
+}
+
+.archivedNote {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-weak);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .title {
+    font-size: 20px;
+    line-height: 26px;
+  }
+}

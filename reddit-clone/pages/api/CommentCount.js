@@ -1,41 +1,45 @@
-import connectToDatabase from '@/db';
+import { checkRateLimit, getClientIp } from '../../middleware/rateLimit';
+import { commentTablesForMonth, timedQuery, isMonth, ID_RE } from '@/lib/submissions';
 
 export default async function handler(req, res) {
+  // Rate limiting
+  const ip = getClientIp(req);
+  if (!checkRateLimit(req, ip, 100, 60000)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
   try {
-    const { id } = req.query;
+    const { id, month } = req.query;
 
     if (!id) {
       return res.status(400).json({ error: 'Missing post ID' });
     }
 
-    const db = await connectToDatabase();
-    
-    let totalComments = 0;
-
-    // Iterate through tables and find comments with the specified link_id
-    const client = await db.connect();
-    try {
-      const result = await client.query(
-        `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'rc%'`
-      );
-
-      const tables = result.rows.map(row => row.table_name);
-
-      for (const table of tables) {
-        const queryResult = await client.query(
-          `SELECT COUNT(*) FROM "${table}" WHERE link_id = 't3_${id}'`
-          // Double quotes around the table name to handle hyphen
-        );
-
-        totalComments += parseInt(queryResult.rows[0].count);
-      }
-    } finally {
-      client.release();
+    if (!ID_RE.test(id)) {
+      return res.status(400).json({ error: 'Invalid post ID format' });
     }
 
-    return res.status(200).json({ totalComments });
+    if (month && !isMonth(month)) {
+      return res.status(400).json({ error: 'Invalid month. Use YYYY-MM' });
+    }
+
+    const tables = (await commentTablesForMonth(month)).filter((t) => t.columns.has('link_id'));
+    if (tables.length === 0) {
+      return res.status(200).json({ available: false, totalComments: 0 });
+    }
+
+    const unionQuery = tables
+      .map((t) => `SELECT COUNT(*) AS count FROM "${t.name}" WHERE link_id = $1`)
+      .join(' UNION ALL ');
+    const { rows } = await timedQuery(`SELECT SUM(count) AS total FROM (${unionQuery}) AS counts`, [`t3_${id.toLowerCase()}`]);
+
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.status(200).json({ available: true, totalComments: parseInt(rows[0].total, 10) || 0 });
   } catch (error) {
-    console.error('Error fetching comments data:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error fetching comments data:', error.message);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 }

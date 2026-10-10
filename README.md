@@ -7,9 +7,9 @@ It uses Postgres to store all the reddit pushshift archives in tables and query 
 
 ## Setup Instructions
 1. Clone the github repo
-2. Download the reddit data, subreddits and comments, from the [academic torrent](https://academictorrents.com/details/9c263fc85366c1ef8f5bb9da0203f4c8c8db75f4)
-3. Run the comments and subreddit tables python files to process all the jsons into postgres tables
-4. Run npm i and npm run dev on the cloned repo and modify the db.js with your postgres connection details
+2. Download the reddit data, subreddits and comments, from the [academic torrent](https://academictorrents.com/details/9c263fc85366c1ef8f5bb9da0203f4c8c8db75f4) into `Data/` (the loader container can also fetch it)
+3. From `reddit-clone/`, run `docker compose up -d --build`. This starts Postgres, the loader (which turns the `.zst` dumps into monthly tables, indexes them and builds the subreddit metadata) and the website on port 3001
+4. See [reddit-clone/README.md](reddit-clone/README.md) for configuration and the maintenance scripts
 5. Done
 
 ## Long Term Goals

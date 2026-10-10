@@ -1,125 +1,90 @@
-import fs from 'fs';
-import path from 'path';
-import connectToDatabase from '../../db';
+import { checkRateLimit, getClientIp } from '../../middleware/rateLimit';
+import {
+  getSubmissionTables, tablesInRange, timedQuery, hasTable, resolveSubreddit, isMonth, SUBREDDIT_RE,
+} from '@/lib/submissions';
 
 export default async function handler(req, res) {
-  try {
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate;
-    const subreddit = req.query.subreddit;
-    const db = await connectToDatabase();
-    let tableNames = [];
+  // Rate limiting
+  const ip = getClientIp(req);
+  if (!checkRateLimit(req, ip, 20, 60000)) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
 
-    if (startDate && endDate) {
-      const startYear = parseInt(startDate.split('-')[0]);
-      const startMonth = parseInt(startDate.split('-')[1]);
-      const endYear = parseInt(endDate.split('-')[0]);
-      const endMonth = parseInt(endDate.split('-')[1]);
-      for (let year = startYear; year <= endYear; year++) {
-        const startM = (year === startYear) ? startMonth : 1;
-        const endM = (year === endYear) ? endMonth : 12;
-        for (let month = startM; month <= endM; month++) {
-          const formattedMonth = month < 10 ? `0${month}` : `${month}`;
-          tableNames.push(`rs_${year}_${formattedMonth}`);
-        }
-      }
-    } else {
-      // Fetch all table names that start with 'rs_'
-      const result = await db.query("SELECT tablename FROM pg_tables WHERE tablename LIKE 'rs_%'");
-      tableNames = result.rows.map(row => row.tablename);
+  try {
+    const { startDate, endDate } = req.query;
+    let subreddit = req.query.subreddit;
+
+    if ((startDate && !isMonth(startDate)) || (endDate && !isMonth(endDate))) {
+      return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM' });
     }
 
-    if (tableNames.length === 0) {
+    if (subreddit === 'all' || subreddit === '') subreddit = undefined;
+    if (subreddit && !SUBREDDIT_RE.test(subreddit)) {
+      return res.status(400).json({ error: 'Invalid subreddit name' });
+    }
+    if (subreddit) subreddit = await resolveSubreddit(subreddit);
+
+    const tables = tablesInRange(await getSubmissionTables(), startDate, endDate)
+      .filter((t) => t.columns.has('author') && t.columns.has('subreddit'));
+    if (tables.length === 0) {
       return res.status(404).json({ error: 'No tables found for the given date range' });
     }
 
-    // Construct the UNION ALL query to fetch data from all tables
-    let unionQuery = tableNames.map(tableName => 
-      `SELECT author, subreddit FROM ${tableName}`
-    ).join(' UNION ALL ');
+    const params = subreddit ? [subreddit] : [];
+    const where = subreddit ? ' WHERE subreddit = $1' : '';
 
-    // Build the main query to fetch stats
-    let query = `
-      WITH all_posts AS (${unionQuery})
-      SELECT
-        COUNT(*) AS total_posts,
-        COUNT(DISTINCT author) AS unique_users,
-        subreddit,
-        COUNT(*) AS subreddit_posts
-      FROM all_posts
-    `;
-
-    if (subreddit && subreddit !== 'all') {
-      query += ` WHERE subreddit = '${subreddit}'`;
+    // Post counts per subreddit come from the precomputed monthly rollup when it exists
+    let topSubreddits;
+    let totalPosts;
+    if (await hasTable('subreddit_monthly')) {
+      const rangeParams = [...params, `${tables[0].month}-01`, `${tables[tables.length - 1].month}-01`];
+      const offset = params.length;
+      const { rows } = await timedQuery(
+        `SELECT subreddit, SUM(posts)::bigint AS posts, SUM(SUM(posts)) OVER ()::bigint AS total
+           FROM subreddit_monthly
+          WHERE month BETWEEN $${offset + 1}::date AND $${offset + 2}::date ${subreddit ? 'AND subreddit = $1' : ''}
+          GROUP BY subreddit ORDER BY posts DESC LIMIT 10`,
+        rangeParams
+      );
+      topSubreddits = rows.map((row) => ({ subreddit: row.subreddit, posts: Number(row.posts) }));
+      totalPosts = rows.length ? Number(rows[0].total) : 0;
     }
 
-    query += `
-      GROUP BY subreddit
-      ORDER BY subreddit_posts DESC
-      LIMIT 10
-    `;
+    const unionQuery = tables.map((t) => `SELECT author, subreddit FROM "${t.name}"${where}`).join(' UNION ALL ');
+    const { rows: userRows } = await timedQuery(
+      `WITH all_posts AS (${unionQuery})
+       SELECT author, COUNT(*) AS post_count, COUNT(*) OVER () AS unique_users, SUM(COUNT(*)) OVER () AS total
+         FROM all_posts
+        WHERE author IS NOT NULL AND author NOT IN ('[deleted]', 'None')
+        GROUP BY author ORDER BY post_count DESC LIMIT 10`,
+      params,
+      30000
+    );
 
-    // Run EXPLAIN ANALYZE for the main query and capture log content
-    const explainAnalyzeMain = await db.query(`EXPLAIN ANALYZE ${query}`);
-    let logContent = logExplainAnalyze(explainAnalyzeMain.rows, 'Main Query');
+    if (!topSubreddits) {
+      const { rows } = await timedQuery(
+        `WITH all_posts AS (${unionQuery})
+         SELECT subreddit, COUNT(*) AS posts, SUM(COUNT(*)) OVER () AS total
+           FROM all_posts GROUP BY subreddit ORDER BY posts DESC LIMIT 10`,
+        params,
+        30000
+      );
+      topSubreddits = rows.map((row) => ({ subreddit: row.subreddit, posts: Number(row.posts) }));
+      totalPosts = rows.length ? Number(rows[0].total) : 0;
+    }
 
-    // Execute the main query
-    const { rows } = await db.query(query);
-
-    // Extract the required stats
-    const totalPosts = rows.reduce((acc, row) => acc + parseInt(row.subreddit_posts), 0);
-    const uniqueUsers = parseInt(rows[0].unique_users);
-
-    // Top 10 subreddits are already sorted by the SQL query
-    const topSubreddits = rows.map(row => ({
-      subreddit: row.subreddit,
-      posts: parseInt(row.subreddit_posts)
-    }));
-
-    // For top users, we need a separate query
-    const topUsersQuery = `
-      WITH all_posts AS (${unionQuery})
-      SELECT author, COUNT(*) as post_count
-      FROM all_posts
-      ${subreddit && subreddit !== 'all' ? `WHERE subreddit = '${subreddit}'` : ''}
-      GROUP BY author
-      ORDER BY post_count DESC
-      LIMIT 10
-    `;
-
-    // Run EXPLAIN ANALYZE for the top users query and capture log content
-    const explainAnalyzeTopUsers = await db.query(`EXPLAIN ANALYZE ${topUsersQuery}`);
-    logContent += logExplainAnalyze(explainAnalyzeTopUsers.rows, 'Top Users Query');
-
-    // Save the combined log content
-    const logPath = path.join(__dirname, '../../../../logs/stats-log.txt');
-    fs.writeFileSync(logPath, logContent, 'utf8');
-
-    const topUsersResult = await db.query(topUsersQuery);
-    const topUsers = topUsersResult.rows.map(row => ({
-      user: row.author,
-      posts: parseInt(row.post_count)
-    }));
-
-    // Send the stats in the response
+    res.setHeader('Cache-Control', 'public, max-age=3600');
     res.status(200).json({
       totalPosts,
-      uniqueUsers,
+      uniqueUsers: userRows.length ? Number(userRows[0].unique_users) : 0,
       topSubreddits,
-      topUsers
+      topUsers: userRows.map((row) => ({ user: row.author, posts: Number(row.post_count) })),
     });
-
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error in Stats API:', error.message);
+    const timedOut = error.code === '57014';
+    res.status(timedOut ? 504 : 500).json({
+      error: timedOut ? 'Stats for this range take too long to compute' : 'Internal Server Error',
+    });
   }
-}
-
-
-function logExplainAnalyze(explainRows, queryName) {
-  const logContent = `
-[${new Date().toISOString()}] - ${queryName}
-${explainRows.map(row => row['QUERY PLAN']).join('\n')}
-`;
-  return logContent;
 }

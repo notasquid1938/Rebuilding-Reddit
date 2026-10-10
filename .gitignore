@@ -26,3 +26,11 @@ Data/imgur/*.warc
 /Data/imgur/*.zst
 /Data/imgur/imgur-*
 /Data/imgur/error.txt
+# Pushshift dumps, decompressed intermediates and loader state
+/Data/*.zst
+/Data/*.json
+/Data/*.log
+/Data/*.torrent
+/Data/torrent_download.complete
+__pycache__/
+/reddit-clone/project.txt

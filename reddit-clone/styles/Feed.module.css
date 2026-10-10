@@ -1,0 +1,179 @@
+.feed {
+  min-height: 50vh;
+}
+
+.message {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-weak);
+}
+
+.emptyTitle {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.retry {
+  margin-top: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.retry:hover {
+  background: var(--bg-secondary-hover);
+}
+
+.end {
+  margin: 24px 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-weak);
+}
+
+.sentinel {
+  height: 1px;
+}
+
+/* ---------- Controls ---------- */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 8px;
+}
+
+.dropdown {
+  position: relative;
+}
+
+.controlButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-weak);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.controlButton:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text-strong);
+}
+
+.controlButton:disabled {
+  cursor: default;
+}
+
+.menu {
+  position: absolute;
+  top: 36px;
+  left: 0;
+  z-index: 20;
+  min-width: 160px;
+  margin: 0;
+  padding: 8px 0;
+  list-style: none;
+  background: var(--bg-elevated);
+  border-radius: 8px;
+  box-shadow: var(--shadow-elevated);
+}
+
+.menuHeading {
+  margin: 0;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-weak);
+}
+
+.menuItem {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: var(--text-strong);
+}
+
+.menuItem:hover {
+  background: var(--bg-hover);
+}
+
+.menuItemActive {
+  background: var(--bg-secondary);
+}
+
+.rangeMenu {
+  min-width: 300px;
+}
+
+.rangeForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px 8px;
+  border-top: 1px solid var(--divider);
+  margin-top: 8px;
+}
+
+.monthPicker {
+  display: flex;
+  gap: 8px;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+.monthPicker legend {
+  float: left;
+  width: 44px;
+  padding: 0;
+  line-height: 36px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-weak);
+}
+
+.monthPicker select {
+  flex: 1;
+  height: 36px;
+  padding: 0 28px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: var(--bg-secondary)
+    url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23576F76' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")
+    no-repeat right 12px center;
+  appearance: none;
+  color: var(--text-strong);
+}
+
+.monthPicker select:hover {
+  background-color: var(--bg-secondary-hover);
+}
+
+.applyButton {
+  align-self: flex-end;
+  height: 36px;
+  padding: 0 20px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--button-primary);
+  color: #fff;
+  font-weight: 600;
+}
+
+.applyButton:hover {
+  background: var(--button-primary-hover);
+}

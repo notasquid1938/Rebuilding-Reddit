@@ -1,0 +1,34 @@
+FROM python:3.9-slim
+
+# Install system dependencies:
+# - zstd: for decompressing the dumps
+# - gcc, libpq-dev: for building psycopg2
+# - netcat-openbsd: for waiting for DB to be ready
+# - aria2: for downloading the torrent
+# - wget: to fetch the .torrent file
+# - postgresql-client: psql, to run the SQL scripts in scripts/
+RUN apt-get update && apt-get install -y \
+    zstd \
+    postgresql-client \
+    gcc \
+    libpq-dev \
+    netcat-openbsd \
+    aria2 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies
+RUN pip install psycopg2
+
+# Copy scripts
+COPY process_comments.py .
+COPY process_submissions.py .
+COPY entrypoint-loader.sh .
+COPY scripts ./scripts
+
+# Make entrypoint executable
+RUN chmod +x entrypoint-loader.sh
+
+CMD ["./entrypoint-loader.sh"]

@@ -1,205 +1,156 @@
+import { useEffect, useState } from 'react';
+import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useState, useEffect } from 'react';
-import styles from '../../styles/id.module.css';
-import ReactMarkdown from 'react-markdown';
-import UpvoteIcon from '../../public/upvote.svg';
-import DownvoteIcon from '../../public/downvote.svg';
-import HomeButton from '@/components/HomeButton';
+import Layout from '@/components/Layout';
+import SubredditIcon from '@/components/SubredditIcon';
+import Markdown from '@/components/Markdown';
+import PostMedia, { LinkThumbnail, LinkDomain } from '@/components/PostMedia';
+import { PostTags } from '@/components/PostCard';
+import { VoteButtons, CommentsButton, ShareButton } from '@/components/PostActions';
+import CommentSection from '@/components/Comments';
+import { CommunityCard, SidebarFooter } from '@/components/Sidebar';
+import { BackIcon } from '@/components/Icons';
+import { addRecentCommunity } from '@/lib/hooks';
+import { decodeEntities, timeAgo, fullDate } from '@/lib/format';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
+import styles from '@/styles/Thread.module.css';
 
-const formatDateTime = (timestamp) => {
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleString();
-};
+export async function getServerSideProps({ params, res }) {
+  const { getPostById, ID_RE } = await import('@/lib/submissions');
+  const id = String(params.id || '').toLowerCase();
+  if (!ID_RE.test(id)) return { notFound: true };
 
-const Comment = ({ comment }) => {
-  const [showReplies, setShowReplies] = useState(false);
-  const [replies, setReplies] = useState([]);
+  const post = await getPostById(id);
+  if (!post) return { notFound: true };
 
-  const fetchReplies = async (commentId) => {
-    try {
-      const response = await fetch(`/api/Replies?commentId=${commentId}`);
-      const data = await response.json();
-      // Sort replies by score in descending order
-      const sortedReplies = data.replies.sort((a, b) => b.score - a.score);
-      setReplies(sortedReplies);
-    } catch (error) {
-      console.error('Error fetching replies:', error);
-    }
-  };
+  res.setHeader('Cache-Control', 'public, s-maxage=86400');
+  return { props: { post } };
+}
 
-  return (
-    <li className={styles.comment}>
-      <p className={styles.commentAuthor}>{comment.author} • {formatDateTime(comment.created_utc)}</p>
-      <div className={styles.commentBody}>
-        <ReactMarkdown>{comment.body}</ReactMarkdown>
-      </div>
-      <div className={styles.commentScoreContainer}>
-        <img
-          src={UpvoteIcon.src}
-          className={styles.upvoteIcon}
-          height={UpvoteIcon.height}
-          width={UpvoteIcon.width}
-        />
-        <p className={styles.commentScore}>{comment.score}</p>
-        <img
-          src={DownvoteIcon.src}
-          className={styles.downvoteIcon}
-          height={DownvoteIcon.height}
-          width={DownvoteIcon.width}
-        />
-      </div>
-      {comment.replies && comment.replies.length > 0 && (
-        <div>
-          <button onClick={() => {
-            setShowReplies(!showReplies);
-            if (!showReplies) {
-              fetchReplies(comment.id); // Fetch replies for this comment
-            }
-          }}>
-            {showReplies ? "Hide Replies" : "Show Replies"}
-          </button>
-          {showReplies && (
-            <ul>
-              {/* Render sorted replies */}
-              {replies.map((reply, index) => (
-                <li key={index} className={styles.reply}>
-                  <Comment comment={reply} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </li>
-  );
-};
+function useCommunityInfo(name) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    if (!name) return;
+    let active = true;
+    fetch(`/api/Subreddit?name=${encodeURIComponent(name)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => active && setInfo(data))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [name]);
+  return info;
+}
 
-const PostDetail = () => {
+const removedText = (text) => ['[deleted]', '[removed]'].includes(text);
+
+function PostDetail({ post }) {
   const router = useRouter();
-  const { id } = router.query;
-  const [postData, setPostData] = useState(null);
-  const [commentsData, setCommentsData] = useState(null);
-  const [commentCount, setCommentCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
+  const info = useCommunityInfo(post.subreddit);
+  const title = decodeEntities(post.title);
+  const hasBody = post.is_self && post.selftext && !removedText(post.selftext);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const postResponse = await fetch(`/api/ID?id=${id}`);
-        const postData = await postResponse.json();
-        setPostData(postData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      }
-    };
+    if (post.subreddit) addRecentCommunity(post.subreddit);
+  }, [post.subreddit]);
 
-    const fetchCommentCount = async () => {
-      try {
-        const commentCountResponse = await fetch(`/api/CommentCount?id=${id}`);
-        const commentCount = await commentCountResponse.json();
-        setCommentCount(commentCount)
-        console.log("Comment Count: ", commentCount)
-      } catch (error) {
-        console.error('Error fetching comments:', error);
-      }
-    }
-  
-    const fetchComments = async () => {
-      try {
-        const commentsResponse = await fetch(`/api/Comments?id=${id}&page=${currentPage}`);
-        const commentsData = await commentsResponse.json();
-        const sortedComments = commentsData.sort((a, b) => b.score - a.score);
-        setCommentsData(sortedComments);
-      } catch (error) {
-        console.error('Error fetching comments:', error);
-      }
-    };
-  
-    if (id) {
-      fetchData();
-      fetchCommentCount();
-      fetchComments(); 
-    }
-  }, [id, currentPage]);
-
-  const handlePageChange = (newPage) => {
-    setCurrentPage(newPage);
+  const goBack = () => {
+    if (window.history.length > 1 && document.referrer.startsWith(window.location.origin)) router.back();
+    else router.push(post.subreddit ? `/r/${post.subreddit}` : '/');
   };
 
+  const description = hasBody
+    ? decodeEntities(post.selftext).replace(/\s+/g, ' ').slice(0, 160)
+    : `Posted in r/${post.subreddit} by u/${post.author} on ${fullDate(post.created_utc)}`;
+
   return (
-    <div>
-      <HomeButton/>
-      <div className={styles.postContainer}>
-        {postData ? (
+    <Layout
+      sidebar={
+        post.subreddit && (
           <>
-            <div className={styles.postInfo}>
-              <img
-                src={`/api/SubredditIcons?subreddit=${postData.subreddit}`}
-                alt={`${postData.subreddit} icon`}
-                className={styles.subredditImage}
-              />
-              <div className={styles.postInfoText}>
-                <p className={styles.postSubreddit}>{postData.subreddit_name_prefixed} • {formatDateTime(postData.created_utc)}</p>
-                <p className={styles.postAuthor}>{postData.author}</p>
-              </div>
-            </div>
-            <p className={styles.postTitle}>{postData.title}</p>
-            <p className={styles.postText}>{postData.selftext}</p>
-            {postData.url.includes('imgur.com') ? (
-              <img
-              src={`/api/ImgurImages?id=${postData.url.split('/').pop()}`}
-                alt="Imgur"
-                className={styles.imgurImage}
-              />
-            ) : (
-              <p>Link: <a className={styles.postLink} href={postData.url} target="_blank" rel="noopener noreferrer">{postData.url}</a></p>
-            )}      
-            <div className={styles.commentCount}>
-              <p>Total Comments: {commentCount.totalComments}</p>
-            </div>
-            <div className={styles.commentScoreContainer}>
-                <img
-                  src={UpvoteIcon.src}
-                  className={styles.upvoteIcon}
-                  height={UpvoteIcon.height}
-                  width={UpvoteIcon.width}
-                />
-                <p className={styles.commentScore}>{postData.score}</p>
-                <img
-                  src={DownvoteIcon.src}
-                  className={styles.downvoteIcon}
-                  height={DownvoteIcon.height}
-                  width={DownvoteIcon.width}
-                />
-              </div>
+            <CommunityCard name={post.subreddit} info={info} showLink />
+            <SidebarFooter />
           </>
-        ) : (
-          <p>Loading...</p>
-        )}
+        )
+      }
+    >
+      <Head>
+        <title>{post.subreddit ? `${title} : r/${post.subreddit}` : `${title} - ${SITE_NAME}`}</title>
+        <meta name="description" content={description} />
+        <link rel="canonical" href={`${SITE_URL}/Thread/${post.id}`} />
+        <meta property="og:type" content="article" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:site_name" content={SITE_NAME} />
+        {post.over_18 && <meta name="rating" content="adult" />}
+      </Head>
 
-        {commentsData ? (
-          <div className={styles.commentsContainer}>
-            <h2>Comments</h2>
-            <ul>
-              {commentsData.map((comment, index) => (
-                <Comment key={index} comment={comment} />
-              ))}
-            </ul>
-
-            <div className={styles.pagination}>
-              {currentPage > 1 && (
-                <button onClick={() => handlePageChange(currentPage - 1)}>Previous</button>
+      <article className={styles.post}>
+        <div className={styles.metaRow}>
+          <button type="button" className={styles.backButton} onClick={goBack} aria-label="Go back">
+            <BackIcon size={16} />
+          </button>
+          {post.subreddit && (
+            <Link href={`/r/${post.subreddit}`} aria-hidden="true" tabIndex={-1}>
+              <SubredditIcon name={post.subreddit} size={32} />
+            </Link>
+          )}
+          <div className={styles.metaText}>
+            <div className={styles.metaTop}>
+              {post.subreddit ? (
+                <Link href={`/r/${post.subreddit}`} className={styles.community}>
+                  r/{post.subreddit}
+                </Link>
+              ) : (
+                <span className={styles.community}>Unknown community</span>
               )}
-              <span>Page {currentPage}</span>
-              <button onClick={() => handlePageChange(currentPage + 1)}>Next</button>
+              <span className={styles.dot}>•</span>
+              <time title={fullDate(post.created_utc)} suppressHydrationWarning>
+                {timeAgo(post.created_utc)}
+              </time>
             </div>
+            {post.author === '[deleted]' ? (
+              <span className={styles.author}>[deleted]</span>
+            ) : (
+              <Link href={`/User/${post.author}`} className={styles.author}>
+                {post.author}
+              </Link>
+            )}
           </div>
-        ) : (
-          <p>Loading comments...</p>
-        )}
-      </div>
-    </div>
+        </div>
+
+        <div className={styles.titleRow}>
+          <div className={styles.titleBlock}>
+            <h1 className={styles.title}>{title}</h1>
+            <PostTags post={post} />
+            <LinkDomain post={post} />
+          </div>
+          <LinkThumbnail post={post} />
+        </div>
+
+        {hasBody && <Markdown className={styles.body}>{post.selftext}</Markdown>}
+        {post.is_self && removedText(post.selftext) && <p className={styles.removed}>{post.selftext}</p>}
+
+        <PostMedia post={post} />
+
+        <p className={styles.archivedNote}>
+          Posted {fullDate(post.created_utc)}
+          {post.edited ? ' · edited' : ''}
+          {post.locked ? ' · locked' : ''}
+        </p>
+
+        <div className={styles.actions}>
+          <VoteButtons score={post.score} />
+          <CommentsButton count={post.num_comments} />
+          <ShareButton path={`/Thread/${post.id}`} />
+        </div>
+      </article>
+
+      <CommentSection post={post} />
+    </Layout>
   );
-};
+}
 
 export default PostDetail;

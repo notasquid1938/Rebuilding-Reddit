@@ -1,36 +1,18 @@
 {
   "name": "reddit-clone",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start --port 80",
-    "lint": "next lint"
+    "start": "next start --port 80"
   },
   "dependencies": {
-    "axios": "^1.6.5",
-    "csv-parser": "^3.0.0",
-    "fs": "^0.0.1-security",
-    "fuzzysort": "^2.0.4",
-    "jaro-winkler": "^0.2.8",
-    "meilisearch": "^0.36.0",
-    "mongodb": "^6.3.0",
-    "next": "^14.1.1",
-    "normalize.css": "^8.0.1",
-    "pg": "^8.11.3",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-helmet": "^6.1.0",
-    "react-markdown": "^9.0.1",
-    "react-router-dom": "^6.21.1",
-    "rehype-raw": "^7.0.0",
-    "remark-breaks": "^4.0.0",
-    "remark-gfm": "^4.0.0",
-    "remark-react": "^9.0.1",
-    "sitemap": "^7.1.1",
-    "snudown-js": "^4.0.1",
-    "sundown": "^2.0.1",
-    "xmlbuilder2": "^3.1.1"
+    "next": "^16.4.0",
+    "pg": "^8.16.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^9.1.0",
+    "remark-gfm": "^4.0.1"
   }
 }

@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  reddit-clone:
+    container_name: reddit-rebuilt-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3001:3000"
+    environment:
+      - POSTGRES_URL=postgres://postgres:postgres@db:5432/Reddit-Rebuilt
+      - NODE_ENV=production
+      - DATA_DIR=/Data
+      - SITE_URL=https://redditrebuilt.com
+    volumes:
+      - ../Data:/Data:ro 
+    depends_on:
+      - db
+    networks:
+      - reddit-net
+    # LIMIT LOGGING HERE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    image: postgres:15-alpine
+    container_name: reddit-rebuilt-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: Reddit-Rebuilt
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - reddit-net
+    # LIMIT LOGGING HERE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Reduce verbosity to stop the "screaming"
+    command: postgres -c log_statement=none -c log_min_error_statement=fatal
+
+  loader:
+    container_name: reddit-data-loader
+    build:
+      context: .
+      dockerfile: Dockerfile.loader
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=Reddit-Rebuilt
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - ../Data:/data
+    depends_on:
+      - db
+    networks:
+      - reddit-net
+    # LIMIT LOGGING HERE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+
+networks:
+  reddit-net:
