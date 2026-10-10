@@ -6,8 +6,23 @@ import { checkRateLimit, getClientIp } from '../../middleware/rateLimit';
 const DATA_DIR = process.env.DATA_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), '../Data');
 const ICONS_DIR = path.join(DATA_DIR, 'reddit/icons');
 
-// Cache of subreddit -> icon path (or null when there is no archived icon)
+// Cache of subreddit -> { path, type } (or null when there is no archived icon)
 const iconCache = new Map();
+
+const ICON_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
+
+// scrape_icons.py saves <lowercase name>.<ext>; older icons were <Name>.png
+function findIcon(subreddit) {
+  const candidates = [
+    ...Object.keys(ICON_TYPES).map((ext) => [`${subreddit.toLowerCase()}.${ext}`, ext]),
+    [`${subreddit}.png`, 'png'],
+  ];
+  for (const [file, ext] of candidates) {
+    const candidate = path.join(ICONS_DIR, file);
+    if (fs.existsSync(/*turbopackIgnore: true*/ candidate)) return { path: candidate, type: ICON_TYPES[ext] };
+  }
+  return null;
+}
 
 const PALETTE = ['#FF4500', '#0079D3', '#46D160', '#FFB000', '#7193FF', '#FF585B', '#0DD3BB', '#DB0064', '#9E58FF', '#349E48'];
 
@@ -34,25 +49,25 @@ export default async (req, res) => {
   }
 
   try {
-    let iconPath = iconCache.get(subreddit);
-    if (iconPath === undefined) {
-      const candidate = path.join(ICONS_DIR, `${subreddit}.png`);
-      iconPath = fs.existsSync(/*turbopackIgnore: true*/ candidate) ? candidate : null;
+    let icon = iconCache.get(subreddit);
+    if (icon === undefined) {
+      icon = findIcon(subreddit);
       if (iconCache.size > 5000) iconCache.clear();
-      iconCache.set(subreddit, iconPath);
+      // Missing icons may be scraped later, so only cache hits
+      if (icon) iconCache.set(subreddit, icon);
     }
 
-    if (iconPath) {
+    if (icon) {
       res.writeHead(200, {
-        'Content-Type': 'image/png',
+        'Content-Type': icon.type,
         'Cache-Control': 'public, max-age=604800',
       });
-      return res.end(fs.readFileSync(/*turbopackIgnore: true*/ iconPath));
+      return res.end(fs.readFileSync(/*turbopackIgnore: true*/ icon.path));
     }
 
     res.writeHead(200, {
       'Content-Type': 'image/svg+xml',
-      'Cache-Control': 'public, max-age=86400',
+      'Cache-Control': 'public, max-age=3600',
     });
     res.end(fallbackIcon(subreddit));
   } catch (error) {

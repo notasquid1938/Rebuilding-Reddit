@@ -1,42 +1,26 @@
--- Builds the lookup tables used by the website:
---   subreddit_monthly   (subreddit, month, posts)          per-month post counts
---   subreddits_metadata (name, entry_count, first_seen,    search suggestions,
---                        last_seen, post_count)            name resolution
--- Safe to re-run after loading new months; it refreshes every month it finds.
--- Usage: docker exec -i reddit-rebuilt-db psql -U postgres -d Reddit-Rebuilt < scripts/build_subreddit_metadata.sql
+-- Builds the lookup tables used by the website (see site_tables.sql) for any
+-- month that doesn't have them yet, then rebuilds subreddits_metadata
+-- (search suggestions, community stats). Safe to re-run.
+-- Requires the objects from site_tables.sql, so run the two together:
+--   cat scripts/site_tables.sql scripts/build_subreddit_metadata.sql | \
+--     docker exec -i reddit-rebuilt-db psql -U postgres -d Reddit-Rebuilt -v ON_ERROR_STOP=1
 
 SET work_mem = '512MB';
-
-CREATE TABLE IF NOT EXISTS subreddit_monthly (
-  subreddit text    NOT NULL,
-  month     date    NOT NULL,
-  posts     integer NOT NULL,
-  PRIMARY KEY (subreddit, month)
-);
-CREATE INDEX IF NOT EXISTS subreddit_monthly_month_idx ON subreddit_monthly (month);
 
 DO $$
 DECLARE
   t text;
-  m date;
 BEGIN
   FOR t IN
     SELECT c.relname FROM pg_class c
      WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r'
        AND c.relname ~ '^rs_\d{4}_\d{2}$'
        AND pg_relation_size(c.oid) > 0
-       AND EXISTS (SELECT 1 FROM pg_attribute a
-                    WHERE a.attrelid = c.oid AND a.attname = 'subreddit' AND NOT a.attisdropped)
+       AND NOT EXISTS (SELECT 1 FROM post_id_ranges r WHERE r.table_name = c.relname)
      ORDER BY c.relname
   LOOP
-    m := to_date(substr(t, 4), 'YYYY_MM');
-    RAISE NOTICE '% counting %', clock_timestamp(), t;
-    DELETE FROM subreddit_monthly WHERE month = m;
-    EXECUTE format(
-      'INSERT INTO subreddit_monthly (subreddit, month, posts)
-       SELECT subreddit, %L::date, count(*) FROM %I
-        WHERE subreddit IS NOT NULL AND subreddit NOT IN ('''', ''None'')
-        GROUP BY subreddit', m, t);
+    RAISE NOTICE '% refreshing %', clock_timestamp(), t;
+    CALL refresh_month(t);
     COMMIT;
   END LOOP;
 END $$;
@@ -57,5 +41,7 @@ DROP TABLE IF EXISTS subreddits_metadata;
 ALTER TABLE subreddits_metadata_new RENAME TO subreddits_metadata;
 COMMIT;
 
+ANALYZE post_id_ranges;
 ANALYZE subreddit_monthly;
+ANALYZE top_posts;
 ANALYZE subreddits_metadata;

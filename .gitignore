@@ -34,3 +34,9 @@ Data/imgur/*.warc
 /Data/torrent_download.complete
 __pycache__/
 /reddit-clone/project.txt
+
+# Postgres archive tablespace
+/pg_archive/
+
+# All archive data (dumps, downloads, icons, subreddit snapshots); tracked scripts in Data/ stay tracked
+/Data/

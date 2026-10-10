@@ -168,10 +168,51 @@ export async function hasTable(name) {
   return rows[0].exists;
 }
 
+// Months in which a subreddit has posts (from subreddit_monthly), so community
+// feeds only touch those tables instead of every month in the archive.
+async function subredditMonths(subreddit) {
+  if (!(await hasTable('subreddit_monthly'))) return null;
+  const db = await connectToDatabase();
+  const { rows } = await db.query(
+    `SELECT to_char(month, 'YYYY-MM') AS month FROM subreddit_monthly WHERE subreddit = $1`,
+    [subreddit]
+  );
+  return new Set(rows.map((r) => r.month));
+}
+
+const TOP_POSTS_PER_MONTH = 1000;
+
+// Unfiltered "Top" pages come from top_posts (each month's top 1000) when
+// every month in range has been summarised and the page is within that depth.
+async function queryTopPosts(tables, limit, offset) {
+  if (offset + limit > TOP_POSTS_PER_MONTH || !(await hasTable('top_posts'))) return null;
+  const db = await connectToDatabase();
+  const months = tables.map((t) => `${t.month}-01`);
+  const { rows: covered } = await db.query(
+    'SELECT count(DISTINCT month)::int AS n FROM top_posts WHERE month = ANY($1::date[])',
+    [months]
+  );
+  if (covered[0].n !== months.length) return null;
+  const { rows } = await timedQuery(
+    `SELECT * FROM top_posts WHERE month = ANY($1::date[]) ORDER BY score DESC NULLS LAST LIMIT $2 OFFSET $3`,
+    [months, limit, offset]
+  );
+  return rows.map(normalizePost);
+}
+
 export async function queryPosts({ startDate, endDate, subreddit, author, sort = 'top', limit = 25, offset = 0 }) {
   const allTables = await getSubmissionTables();
-  const tables = author ? allTables : tablesInRange(allTables, startDate, endDate);
+  let tables = author ? allTables : tablesInRange(allTables, startDate, endDate);
+  if (subreddit && !author) {
+    const months = await subredditMonths(subreddit);
+    if (months) tables = tables.filter((t) => months.has(t.month));
+  }
   if (tables.length === 0) return [];
+
+  if (!subreddit && !author && sort === 'top') {
+    const top = await queryTopPosts(tables, limit, offset);
+    if (top) return top;
+  }
 
   const params = [];
   const where = [];
@@ -203,8 +244,26 @@ export async function queryPosts({ startDate, endDate, subreddit, author, sort =
   return rows.map(normalizePost);
 }
 
+// Reddit ids are sequential base-36 numbers, so post_id_ranges narrows a
+// lookup to the month(s) whose id range contains it.
+async function tablesForId(tables, id) {
+  if (!(await hasTable('post_id_ranges'))) return tables;
+  const value = parseInt(id, 36);
+  if (!Number.isSafeInteger(value)) return tables;
+  const db = await connectToDatabase();
+  const { rows } = await db.query(
+    'SELECT table_name FROM post_id_ranges WHERE $1::bigint BETWEEN id_min AND id_max',
+    [value]
+  );
+  const names = new Set(rows.map((r) => r.table_name));
+  // Months without a range yet (just loaded / legacy) are still searched
+  const { rows: known } = await db.query('SELECT table_name FROM post_id_ranges');
+  const summarised = new Set(known.map((r) => r.table_name));
+  return tables.filter((t) => names.has(t.name) || !summarised.has(t.name));
+}
+
 export async function getPostById(id) {
-  const tables = await getSubmissionTables();
+  const tables = await tablesForId(await getSubmissionTables(), id);
   const branches = tables
     .filter((t) => t.columns.has('id'))
     .map((t) => `SELECT ${selectColumns(t, POST_DETAIL_COLUMNS)}, '${t.month}' AS month FROM "${t.name}" WHERE id = $1`);
@@ -285,24 +344,65 @@ export async function fetchCommentTree(tables, rootFullnames, { depth = 4, limit
 
 const toMonth = (date) => (date ? new Date(date).toISOString().slice(0, 7) : null);
 
+// Archive stats (subreddits_metadata) merged with the community's about page
+// (subreddit_about, from the Arctic Shift subreddit snapshots).
 export async function getSubredditInfo(name) {
-  if (!(await hasTable('subreddits_metadata'))) return null;
-  const { rows } = await timedQuery(
-    `SELECT name, entry_count, first_seen, last_seen, post_count
-       FROM subreddits_metadata WHERE lower(name) = lower($1)
-      ORDER BY post_count DESC LIMIT 1`,
-    [name],
-    5000
-  );
-  const row = rows[0];
-  if (!row) return null;
-  return {
-    name: row.name,
-    months: Number(row.entry_count),
-    posts: Number(row.post_count),
-    firstMonth: toMonth(row.first_seen),
-    lastMonth: toMonth(row.last_seen),
-  };
+  const [hasMeta, hasAbout] = await Promise.all([hasTable('subreddits_metadata'), hasTable('subreddit_about')]);
+  let info = null;
+  if (hasMeta) {
+    const { rows } = await timedQuery(
+      `SELECT name, entry_count, first_seen, last_seen, post_count
+         FROM subreddits_metadata WHERE lower(name) = lower($1)
+        ORDER BY post_count DESC LIMIT 1`,
+      [name],
+      5000
+    );
+    const row = rows[0];
+    if (row) {
+      info = {
+        name: row.name,
+        months: Number(row.entry_count),
+        posts: Number(row.post_count),
+        firstMonth: toMonth(row.first_seen),
+        lastMonth: toMonth(row.last_seen),
+      };
+    }
+  }
+  if (hasAbout) {
+    const { rows } = await timedQuery(
+      `SELECT name, title, public_description, description, subscribers, created_utc, over18,
+              subreddit_type, banner_url, primary_color, key_color
+         FROM subreddit_about WHERE lower(name) = lower($1)
+        ORDER BY subscribers DESC NULLS LAST LIMIT 1`,
+      [info?.name || name],
+      5000
+    );
+    const row = rows[0];
+    if (row) {
+      info = {
+        months: 0,
+        posts: 0,
+        firstMonth: null,
+        lastMonth: null,
+        ...info,
+        name: info?.name || row.name,
+        about: {
+          title: row.title,
+          publicDescription: row.public_description,
+          description: row.description,
+          subscribers: row.subscribers === null ? null : Number(row.subscribers),
+          createdUtc: row.created_utc === null ? null : Number(row.created_utc),
+          over18: row.over18,
+          type: row.subreddit_type,
+          bannerUrl: row.banner_url,
+          color: row.key_color || row.primary_color,
+          // Only a name was recorded: the subreddit was already banned or private
+          unavailable: row.title === null && row.subscribers === null,
+        },
+      };
+    }
+  }
+  return info;
 }
 
 // Wide ranges aggregate millions of rollup rows, and the data only changes

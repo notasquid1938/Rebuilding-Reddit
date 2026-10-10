@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import SubredditIcon from './SubredditIcon';
 import { useAvailableMonths } from '@/lib/hooks';
-import { formatCount, monthLabel, fullDate } from '@/lib/format';
+import Markdown from './Markdown';
+import { formatCount, monthLabel, fullDate, decodeEntities } from '@/lib/format';
 import styles from '@/styles/Sidebar.module.css';
 
 export const SidebarCard = ({ title, children }) => (
@@ -78,29 +79,65 @@ export const TopCommunitiesCard = ({ from, to, title = 'Top communities', exclud
   );
 };
 
-export const CommunityCard = ({ name, info, showLink = false }) => (
-  <SidebarCard>
-    <div className={styles.communityHeader}>
-      <SubredditIcon name={name} size={40} />
-      <h2 className={styles.communityTitle}>r/{name}</h2>
-    </div>
-    <p className={styles.text}>
-      Archived posts from r/{name}
-      {info?.firstMonth ? `, ${monthLabel(info.firstMonth)} to ${monthLabel(info.lastMonth)}.` : '.'}
-    </p>
-    {info && (
-      <div className={styles.stats}>
-        <Stat value={formatCount(info.posts)} label="Archived posts" />
-        <Stat value={info.months} label="Active months" />
+const CommunitySidebarText = ({ text }) => {
+  const [expanded, setExpanded] = useState(false);
+  const long = text.length > 600;
+  return (
+    <div className={styles.sidebarText}>
+      <div className={expanded || !long ? undefined : styles.clamped}>
+        <Markdown>{text}</Markdown>
       </div>
-    )}
-    {showLink && (
-      <Link href={`/r/${name}`} className={styles.primaryButton}>
-        View community
-      </Link>
-    )}
-  </SidebarCard>
-);
+      {long && (
+        <button type="button" className={styles.linkButton} onClick={() => setExpanded(!expanded)}>
+          {expanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+    </div>
+  );
+};
+
+export const CommunityCard = ({ name, info, showLink = false, showSidebar = false }) => {
+  const about = info?.about;
+  return (
+    <SidebarCard>
+      <div className={styles.communityHeader}>
+        <SubredditIcon name={name} size={40} />
+        <div className={styles.communityText}>
+          <h2 className={styles.communityTitle}>{about?.title ? decodeEntities(about.title) : `r/${name}`}</h2>
+          {about?.title && <span className={styles.communityMeta}>r/{name}</span>}
+        </div>
+      </div>
+      {about?.unavailable && (
+        <p className={styles.notice}>This community was banned or made private before it could be archived in full.</p>
+      )}
+      <p className={styles.text}>
+        {about?.publicDescription
+          ? decodeEntities(about.publicDescription)
+          : `Archived posts from r/${name}${info?.firstMonth ? `, ${monthLabel(info.firstMonth)} to ${monthLabel(info.lastMonth)}` : ''}.`}
+      </p>
+      {about?.createdUtc && (
+        <p className={styles.textSmall}>
+          Created {new Date(about.createdUtc * 1000).toLocaleDateString('en-US', { dateStyle: 'medium', timeZone: 'UTC' })}
+          {about.over18 ? ' · NSFW' : ''}
+          {about.type && about.type !== 'public' ? ` · ${about.type}` : ''}
+        </p>
+      )}
+      {info && (
+        <div className={styles.stats}>
+          {about?.subscribers != null && <Stat value={formatCount(about.subscribers)} label="Members (last snapshot)" />}
+          <Stat value={formatCount(info.posts)} label="Archived posts" />
+          {!(about?.subscribers != null) && <Stat value={info.months} label="Active months" />}
+        </div>
+      )}
+      {showSidebar && about?.description && <CommunitySidebarText text={about.description} />}
+      {showLink && (
+        <Link href={`/r/${name}`} className={styles.primaryButton}>
+          View community
+        </Link>
+      )}
+    </SidebarCard>
+  );
+};
 
 export const UserCard = ({ name }) => {
   const [stats, setStats] = useState(null);

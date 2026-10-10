@@ -1,67 +1,86 @@
 #!/bin/bash
-set -e
+# Keeps the archive complete: downloads any missing monthly dumps, loads them,
+# refreshes the website's lookup tables, loads subreddit about pages and
+# scrapes subreddit icons. Repeats every REFRESH_HOURS so newly published
+# months fill in on their own.
+set -u
 
-# --- CONFIGURATION ---
-TORRENT_URL="https://academictorrents.com/download/ba051999301b109eab37d16f027b3f49ade2de13.torrent"
-TORRENT_FILE="reddit_dump.torrent"
-TORRENT_COMPLETED_FLAG="torrent_download.complete"
-DATA_DIR="/data"
+DATA_DIR="${DATA_DIR:-/data}"
+SUBREDDIT_DIR="$DATA_DIR/subreddits"
+# Arctic Shift subreddit about-page snapshots (icons, descriptions); oldest first
+SUBREDDIT_TORRENTS="c902f4b65f0e82a5e37db205c3405f02a028ecdf 5d0bf258a025a5b802572ddc29cde89bf093185c"
+export PGPASSWORD="$POSTGRES_PASSWORD"
+PSQL=(psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -q)
 
-# Ensure the data directory exists
 mkdir -p "$DATA_DIR"
-
-# CRITICAL: Switch to the data directory so aria2c downloads here
-# and Python scripts check this folder for ZST files.
 cd "$DATA_DIR"
 
-echo "Current working directory: $(pwd)"
-echo "Checking for data..."
+echo "Waiting for Postgres..."
+until nc -z "$POSTGRES_HOST" 5432; do sleep 2; done
+until "${PSQL[@]}" -c 'SELECT 1' > /dev/null 2>&1; do sleep 2; done
+echo "Postgres is ready."
 
-# Check if we have successfully downloaded before
-if [ -f "$TORRENT_COMPLETED_FLAG" ]; then
-    echo "Torrent download flag found. Skipping download."
-else
-    # Fallback: Check if ZST files exist
-    count=$(ls -1 *.zst 2>/dev/null | wc -l)
-    
-    if [ "$count" != "0" ]; then
-        echo "Found $count .zst files. Skipping download."
-        touch "$TORRENT_COMPLETED_FLAG"
-    else
-        echo "No .zst files found. Starting automated download."
-        echo "WARNING: This dataset is ~3.12TB."
-        
-        wget -O "$TORRENT_FILE" "$TORRENT_URL"
-        aria2c --seed-time=0 --summary-interval=60 "$TORRENT_FILE"
-        
-        echo "Download complete. Flattening directory structure..."
-        find . -mindepth 2 -name "*.zst" -exec mv {} . \;
-        find . -type d -empty -delete
-        
-        touch "$TORRENT_COMPLETED_FLAG"
-    fi
+if [ -n "${LOADER_TABLESPACE:-}" ]; then
+  exists=$("${PSQL[@]}" -tAc "SELECT 1 FROM pg_tablespace WHERE spcname = '$LOADER_TABLESPACE'")
+  if [ "$exists" != "1" ]; then
+    echo "Creating tablespace $LOADER_TABLESPACE at $TABLESPACE_LOCATION"
+    "${PSQL[@]}" -c "CREATE TABLESPACE $LOADER_TABLESPACE LOCATION '$TABLESPACE_LOCATION'"
+    "${PSQL[@]}" -c "ALTER TABLESPACE $LOADER_TABLESPACE SET (random_page_cost = ${TABLESPACE_RANDOM_PAGE_COST:-4})"
+  fi
 fi
 
-# --- WAIT FOR DB ---
-echo "Waiting for Postgres to be ready..."
-while ! nc -z $POSTGRES_HOST 5432; do
-  sleep 1
+KINDS="submissions"
+FETCH_KINDS="submissions"
+if [ "${LOAD_COMMENTS:-0}" = "1" ]; then
+  KINDS="submissions comments"
+  FETCH_KINDS="submissions,comments"
+fi
+export FETCH_KINDS
+
+fetch_subreddit_dumps() {
+  mkdir -p "$SUBREDDIT_DIR"
+  for hash in $SUBREDDIT_TORRENTS; do
+    [ -f "$SUBREDDIT_DIR/$hash.done" ] && continue
+    wget -q -O "$SUBREDDIT_DIR/$hash.torrent" "https://academictorrents.com/download/$hash.torrent" || continue
+    # Only the about-page files (skip wikis and rules)
+    files=$(aria2c --show-files "$SUBREDDIT_DIR/$hash.torrent" | grep -E '^ *[0-9]+\|.*/subreddits(_meta_only)?_[0-9-]+\.zst' | cut -d'|' -f1 | tr -d ' ' | paste -sd,)
+    [ -n "$files" ] || continue
+    aria2c --seed-time=0 --summary-interval=300 --disable-ipv6=true --dir="$SUBREDDIT_DIR" \
+      --select-file="$files" "$SUBREDDIT_DIR/$hash.torrent" && touch "$SUBREDDIT_DIR/$hash.done"
+  done
+}
+
+subreddits_and_icons() {
+  fetch_subreddit_dumps
+  python3 -u /app/subreddits_loader.py
+  python3 -u /app/scrape_icons.py
+}
+
+run_cycle() {
+  echo "=== $(date -u) archive refresh ==="
+
+  # Icons for communities already in the archive don't need to wait for the load
+  subreddits_and_icons &
+  icons_pid=$!
+
+  python3 -u /app/fetch_dumps.py &
+  fetch_pid=$!
+
+  # Load what's on disk while the rest downloads, then load the new arrivals
+  for kind in $KINDS; do python3 -u /app/dump_loader.py "$kind"; done
+  wait "$fetch_pid"
+  for kind in $KINDS; do python3 -u /app/dump_loader.py "$kind"; done
+
+  echo "--- Refreshing site lookup tables ---"
+  "${PSQL[@]}" -f /app/scripts/site_tables.sql -f /app/scripts/build_subreddit_metadata.sql
+
+  # Second icon pass covers communities that first appeared in the new months
+  wait "$icons_pid"
+  python3 -u /app/scrape_icons.py
+  echo "=== $(date -u) refresh complete ==="
+}
+
+while true; do
+  run_cycle
+  sleep "${REFRESH_HOURS:-24}h"
 done
-echo "Postgres is ready!"
-
-# --- RUN PROCESSING SCRIPTS ---
-# Note: We are in /data, but scripts are in /app.
-# Python scripts use os.getcwd() (which is now /data) to find files.
-
-echo "--- Starting Submissions Processor ---"
-python3 -u /app/process_submissions.py
-
-echo "--- Starting Comments Processor ---"
-python3 -u /app/process_comments.py
-
-echo "--- Refreshing subreddit metadata (search suggestions, community stats) ---"
-PGPASSWORD="$POSTGRES_PASSWORD" psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-    -v ON_ERROR_STOP=1 -f /app/scripts/build_subreddit_metadata.sql
-
-echo "ETL Complete. Container sleeping."
-sleep infinity

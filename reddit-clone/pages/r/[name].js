@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
@@ -31,22 +31,37 @@ export async function getServerSideProps({ params, res }) {
   return { props: { name: info?.name || name, info } };
 }
 
-const CommunityBanner = ({ name, info }) => (
-  <div className={styles.bannerWrap}>
-    <div className={styles.banner} />
-    <div className={styles.headerRow}>
-      <SubredditIcon name={name} size={88} className={styles.bigIcon} />
-      <div className={styles.headerText}>
-        <h1 className={styles.headerTitle}>r/{name}</h1>
-        {info && (
-          <p className={styles.headerSub}>
-            {formatCount(info.posts)} archived posts · {monthLabel(info.firstMonth)} – {monthLabel(info.lastMonth)}
-          </p>
+const CommunityBanner = ({ name, info }) => {
+  const [bannerFailed, setBannerFailed] = useState(false);
+  const about = info?.about;
+  const color = about?.color && /^#[0-9a-f]{3,8}$/i.test(about.color) ? about.color : null;
+  return (
+    <div className={styles.bannerWrap}>
+      <div className={styles.banner} style={color ? { background: color } : undefined}>
+        {about?.bannerUrl && !bannerFailed && (
+          <img
+            src={about.bannerUrl}
+            alt=""
+            className={styles.bannerImage}
+            referrerPolicy="no-referrer"
+            onError={() => setBannerFailed(true)}
+          />
         )}
       </div>
+      <div className={styles.headerRow}>
+        <SubredditIcon name={name} size={88} className={styles.bigIcon} />
+        <div className={styles.headerText}>
+          <h1 className={styles.headerTitle}>r/{name}</h1>
+          {info?.posts > 0 && (
+            <p className={styles.headerSub}>
+              {formatCount(info.posts)} archived posts · {monthLabel(info.firstMonth)} – {monthLabel(info.lastMonth)}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 function CommunityPage({ name, info }) {
   const router = useRouter();
@@ -54,7 +69,7 @@ function CommunityPage({ name, info }) {
   const feedQuery = { subreddit: name, startDate: range?.from, endDate: range?.to, sort: 'top' };
 
   useEffect(() => {
-    if (info) addRecentCommunity(name);
+    if (info?.posts) addRecentCommunity(name);
   }, [name, info]);
 
   const setRange = (next) => {
@@ -67,7 +82,7 @@ function CommunityPage({ name, info }) {
       banner={<CommunityBanner name={name} info={info} />}
       sidebar={
         <>
-          <CommunityCard name={name} info={info} />
+          <CommunityCard name={name} info={info} showSidebar />
           <TopCommunitiesCard from={range?.from} to={range?.to} title="Other communities" exclude={name} />
           <SidebarFooter />
         </>
@@ -75,7 +90,10 @@ function CommunityPage({ name, info }) {
     >
       <Head>
         <title>{`r/${name} - ${SITE_NAME}`}</title>
-        <meta name="description" content={`Archived top posts from r/${name}, rebuilt from Reddit's history.`} />
+        <meta
+          name="description"
+          content={info?.about?.publicDescription || `Archived top posts from r/${name}, rebuilt from Reddit's history.`}
+        />
         <meta property="og:title" content={`r/${name}`} />
       </Head>
 
