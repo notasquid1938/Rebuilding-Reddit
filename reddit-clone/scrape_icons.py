@@ -76,7 +76,12 @@ def candidates(conn, have):
                AND (f.name IS NULL OR (f.status <> 'ok' AND f.attempted_at < now() - %s * interval '1 day')
                     OR f.url <> a.icon_url)
              ORDER BY m.post_count DESC""", (RETRY_DAYS,))
-        rows = [(name, url) for name, url in cur.fetchall() if name.lower() not in have]
+        # Names differing only in case share one file; keep the busiest community's icon
+        rows, seen = [], set(have)
+        for name, url in cur.fetchall():
+            if name.lower() not in seen:
+                seen.add(name.lower())
+                rows.append((name, url))
     return rows[:LIMIT] if LIMIT else rows
 
 
@@ -96,12 +101,12 @@ def fetch(session, limiter, name, url):
         target = os.path.join(ICON_DIR, f'{name.lower()}.{ext}')
         if os.path.exists(target):
             return name, url, 'ok'
-        tmp = f'{target}.part'
+        tmp = f'{target}.{threading.get_ident()}.part'
         with open(tmp, 'wb') as f:
             f.write(data)
         os.replace(tmp, target)
         return name, url, 'ok'
-    except requests.RequestException as error:
+    except (requests.RequestException, OSError) as error:
         return name, url, f'error {type(error).__name__}'
 
 
