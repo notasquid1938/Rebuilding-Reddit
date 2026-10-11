@@ -12,6 +12,7 @@ import CommentSection from '@/components/Comments';
 import { CommunityCard, SidebarFooter } from '@/components/Sidebar';
 import { BackIcon } from '@/components/Icons';
 import { addRecentCommunity } from '@/lib/hooks';
+import { canGoBack } from '@/lib/navigation';
 import { decodeEntities, timeAgo, fullDate } from '@/lib/format';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 import styles from '@/styles/Thread.module.css';
@@ -57,7 +58,7 @@ function PostDetail({ post }) {
   }, [post.subreddit]);
 
   const goBack = () => {
-    if (window.history.length > 1 && document.referrer.startsWith(window.location.origin)) router.back();
+    if (canGoBack()) router.back();
     else router.push(post.subreddit ? `/r/${post.subreddit}` : '/');
   };
 
