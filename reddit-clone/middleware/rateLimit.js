@@ -9,8 +9,12 @@ const rateLimit = new Map();
  * @returns {boolean} - True if request is allowed, false if rate limited
  */
 export function checkRateLimit(req, identifier, maxRequests = 100, windowMs = 60000) {
+  if (process.env.DISABLE_RATE_LIMIT === '1') return true;
   const now = Date.now();
-  const userRequests = rateLimit.get(identifier) || [];
+  // Each endpoint has its own budget: a page load fetches many icons, which
+  // must not use up the allowance for feeds
+  const key = `${(req.url || '').split('?')[0]}|${identifier}`;
+  const userRequests = rateLimit.get(key) || [];
   
   // Remove old requests outside the window
   const recentRequests = userRequests.filter(time => now - time < windowMs);
@@ -20,7 +24,7 @@ export function checkRateLimit(req, identifier, maxRequests = 100, windowMs = 60
   }
   
   recentRequests.push(now);
-  rateLimit.set(identifier, recentRequests);
+  rateLimit.set(key, recentRequests);
   
   return true;
 }
