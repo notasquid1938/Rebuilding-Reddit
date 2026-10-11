@@ -185,6 +185,14 @@ a.communityItem:hover {
   color: var(--text-weak);
 }
 
+/* Old-style sidebars use headings as section labels; keep them at text size */
+.sidebarText :global(.md) :is(h1, h2, h3, h4, h5, h6) {
+  margin: 12px 0 4px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-strong);
+}
+
 .clamped {
   max-height: 240px;
   overflow: hidden;

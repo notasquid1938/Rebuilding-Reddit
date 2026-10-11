@@ -347,7 +347,11 @@ const toMonth = (date) => (date ? new Date(date).toISOString().slice(0, 7) : nul
 // Archive stats (subreddits_metadata) merged with the community's about page
 // (subreddit_about, from the Arctic Shift subreddit snapshots).
 export async function getSubredditInfo(name) {
-  const [hasMeta, hasAbout] = await Promise.all([hasTable('subreddits_metadata'), hasTable('subreddit_about')]);
+  const [hasMeta, hasAbout, hasMonthly] = await Promise.all([
+    hasTable('subreddits_metadata'),
+    hasTable('subreddit_about'),
+    hasTable('subreddit_monthly'),
+  ]);
   let info = null;
   if (hasMeta) {
     const { rows } = await timedQuery(
@@ -365,6 +369,27 @@ export async function getSubredditInfo(name) {
         posts: Number(row.post_count),
         firstMonth: toMonth(row.first_seen),
         lastMonth: toMonth(row.last_seen),
+      };
+    }
+  }
+  // subreddits_metadata is rebuilt once per loader cycle; subreddit_monthly is
+  // updated as each month loads, so take the totals from it when possible.
+  if (hasMonthly) {
+    const { rows } = await timedQuery(
+      `SELECT count(*)::integer AS months, sum(posts)::bigint AS posts,
+              to_char(min(month), 'YYYY-MM') AS first_month, to_char(max(month), 'YYYY-MM') AS last_month
+         FROM subreddit_monthly WHERE subreddit = $1`,
+      [info?.name || name],
+      5000
+    );
+    const row = rows[0];
+    if (row?.months > 0) {
+      info = {
+        name: info?.name || name,
+        months: row.months,
+        posts: Number(row.posts),
+        firstMonth: row.first_month,
+        lastMonth: row.last_month,
       };
     }
   }
@@ -406,21 +431,44 @@ export async function getSubredditInfo(name) {
 }
 
 // Wide ranges aggregate millions of rollup rows, and the data only changes
-// when the loader runs, so results are kept for an hour.
+// when the loader runs, so results are kept for an hour. Concurrent requests
+// share one query, and a failed refresh serves the previous result.
 const topCommunitiesCache = new Map();
+const topCommunitiesInFlight = new Map();
 const TOP_COMMUNITIES_CACHE_MS = 60 * 60 * 1000;
 
 export async function getTopCommunities(startDate, endDate, limit = 10) {
   const key = `${startDate || ''}|${endDate || ''}|${limit}`;
   const cached = topCommunitiesCache.get(key);
   if (cached && Date.now() - cached.time < TOP_COMMUNITIES_CACHE_MS) return cached.value;
-  const value = await queryTopCommunities(startDate, endDate, limit);
-  if (topCommunitiesCache.size > 500) topCommunitiesCache.clear();
-  topCommunitiesCache.set(key, { time: Date.now(), value });
-  return value;
+  if (!topCommunitiesInFlight.has(key)) {
+    const query = queryTopCommunities(startDate, endDate, limit)
+      .then((value) => {
+        if (topCommunitiesCache.size > 500) topCommunitiesCache.clear();
+        topCommunitiesCache.set(key, { time: Date.now(), value });
+        return value;
+      })
+      .finally(() => topCommunitiesInFlight.delete(key));
+    topCommunitiesInFlight.set(key, query);
+  }
+  try {
+    return await topCommunitiesInFlight.get(key);
+  } catch (error) {
+    if (cached) return cached.value;
+    throw error;
+  }
 }
 
 async function queryTopCommunities(startDate, endDate, limit) {
+  // All time: subreddits_metadata already has the totals, indexed by post_count
+  if (!isMonth(startDate) && !isMonth(endDate) && (await hasTable('subreddits_metadata'))) {
+    const { rows } = await timedQuery(
+      'SELECT name, post_count FROM subreddits_metadata ORDER BY post_count DESC LIMIT $1',
+      [limit],
+      10000
+    );
+    return rows.map((row) => ({ name: row.name, posts: Number(row.post_count) }));
+  }
   if (!(await hasTable('subreddit_monthly'))) return [];
   const params = [limit];
   let where = '';
@@ -450,7 +498,7 @@ export async function getUserStats(author) {
             MIN(created_utc) AS first_post, MAX(created_utc) AS last_post
        FROM (${branches.join(' UNION ALL ')}) AS posts`,
     [author],
-    8000
+    20000
   );
   const row = rows[0];
   return {
