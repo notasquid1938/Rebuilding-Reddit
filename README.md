@@ -135,6 +135,18 @@ POSTGRES_URL=postgres://postgres:postgres@<db-host>:5432/Reddit-Rebuilt npm run 
 
 The site is a Next.js (Pages Router) app: pages in `pages/`, API routes in `pages/api/`, and shared database code in `lib/submissions.js`. See [reddit-clone/README.md](reddit-clone/README.md) for the code layout and maintenance scripts.
 
+### Tests
+
+Every pull request runs the full suite on GitHub Actions (`.github/workflows/ci.yml`). To run it locally from `reddit-clone/`:
+
+```bash
+npm test                 # JavaScript unit tests (Vitest)
+npm run test:python      # loader unit tests (pytest; needs pytest + psycopg2)
+npm run test:integration # everything below, against a throwaway database
+```
+
+The integration run generates a miniature archive (`tests/fixtures/build_fixtures.py`), loads it into an empty `*_test` database with the real loaders, checks the result, then builds and starts the website and runs the Playwright API and browser tests (`tests/e2e/`) on desktop and mobile. Without `POSTGRES_HOST` it starts its own `postgres:15` container; it refuses to touch a database whose name doesn't end in `_test`. Locally, `PW_CHANNEL=chrome` uses an installed Chrome instead of running `npx playwright install chromium`.
+
 ## Long Term Goals
 - [x] Switch the database from MongoDB to PostgreSQL, so that anyone using *all* of Reddit's data doesn't hit a database bottleneck
 - [x] Keep the archive current automatically: the loader follows Arctic Shift's monthly releases

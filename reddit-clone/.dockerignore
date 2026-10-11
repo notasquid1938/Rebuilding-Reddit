@@ -7,3 +7,7 @@ logs
 *.log
 project.txt
 create-txt.py
+# Tests and their output
+tests
+test-results
+playwright-report

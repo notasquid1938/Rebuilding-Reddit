@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start --port 80"
+    "start": "next start --port 80",
+    "test": "vitest run",
+    "test:python": "python3 -m pytest tests/python -q",
+    "test:integration": "bash tests/run-integration.sh"
   },
   "dependencies": {
     "next": "^16.4.0",
@@ -14,5 +17,9 @@
     "react-dom": "^19.2.0",
     "react-markdown": "^9.1.0",
     "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "vitest": "^5.0.3"
   }
 }
