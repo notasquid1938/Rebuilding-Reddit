@@ -58,13 +58,18 @@ MAGNET_RE = re.compile(r'^(\d{4}-\d{2}) - (\d{4}-\d{2}) magnet link: `magnet:\?x
 
 
 def load_sources():
-    """Parse the zst column of download_links.md, skipping superseded (struck-out) rows."""
+    """Current zst torrents from Arctic Shift's download_links.md (built-in list if unreachable)."""
     try:
         with urllib.request.urlopen(LINKS_URL, timeout=30) as response:
             text = response.read().decode('utf-8')
     except OSError as error:
         print(f'[fetch] could not read download links ({error}); using built-in list', flush=True)
         return FALLBACK_SOURCES
+    return parse_sources(text) or FALLBACK_SOURCES
+
+
+def parse_sources(text):
+    """(first month, last month, infohash) per zst torrent, skipping superseded (struck-out) rows."""
     sources = []
     for line in text.splitlines():
         magnet = MAGNET_RE.match(line)
@@ -79,7 +84,7 @@ def load_sources():
         if match and '~~' not in zst_cell:
             first, last = row.group(1), row.group(2) or row.group(1)
             sources.append((first, last, match.group(1)))
-    return sources or FALLBACK_SOURCES
+    return sources
 
 
 def month_range(first, last):

@@ -1,0 +1,90 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: reddit-clone
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: reddit-clone/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - name: JavaScript
+        run: npm test
+      - name: Python
+        run: |
+          pip install pytest psycopg2-binary requests
+          python -m pytest tests/python -q
+
+  integration:
+    name: Loader, API and browser tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: reddit_rebuilt_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: reddit_rebuilt_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: reddit-clone/package-lock.json
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y zstd postgresql-client
+          npm ci
+          npx playwright install --with-deps chromium
+          pip install pytest psycopg2-binary requests
+      - name: Run
+        run: bash tests/run-integration.sh
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            reddit-clone/playwright-report
+            reddit-clone/test-results
+          retention-days: 14
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Website image
+        run: docker build -t reddit-rebuilt-app .
+      - name: Loader image
+        run: docker build -f Dockerfile.loader -t reddit-rebuilt-loader .
