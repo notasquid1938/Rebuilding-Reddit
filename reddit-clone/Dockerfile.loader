@@ -2,12 +2,14 @@ FROM python:3.12-slim
 
 # System dependencies:
 # - zstd: streams the dumps
+# - lbzip2: streams the 2015 gap-fill corpus (parallel bzip2)
 # - postgresql-client: psql, for the SQL scripts in scripts/
 # - netcat-openbsd: waits for the database
 # - aria2: downloads the dump torrents
 # - wget: fetches .torrent files
 RUN apt-get update && apt-get install -y --no-install-recommends \
     zstd \
+    lbzip2 \
     postgresql-client \
     netcat-openbsd \
     aria2 \
@@ -17,9 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir psycopg2-binary requests
+RUN pip install --no-cache-dir psycopg2-binary requests numpy
 
-COPY dump_loader.py fetch_dumps.py subreddits_loader.py scrape_icons.py entrypoint-loader.sh ./
+COPY dump_loader.py fetch_dumps.py subreddits_loader.py scrape_icons.py gapfill_loader.py entrypoint-loader.sh ./
 COPY scripts ./scripts
 
 RUN chmod +x entrypoint-loader.sh

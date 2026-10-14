@@ -1,6 +1,11 @@
 import { test, expect, FIXTURE } from './fixtures';
 
-const feedTitles = (page) => page.locator('article h2, article h3').allTextContents();
+// Feeds are fetched client-side after navigation, so wait for the first post
+async function feedTitles(page) {
+  const titles = page.locator('article h2, article h3');
+  await titles.first().waitFor();
+  return titles.allTextContents();
+}
 
 test.describe('Home', () => {
   test('shows the top posts of the default range, decoded', async ({ page }) => {
