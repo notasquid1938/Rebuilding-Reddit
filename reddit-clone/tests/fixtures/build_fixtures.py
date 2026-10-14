@@ -1,12 +1,14 @@
 """
 Writes a miniature archive for the integration tests: monthly RS_/RC_ dumps,
-two subreddit snapshots and an icon, in the same formats as the real data.
+two subreddit snapshots, an icon and a gap-fill corpus, in the same formats as
+the real data.
 
 Usage: python3 tests/fixtures/build_fixtures.py <data dir>
 
 The tests (tests/python/test_integration.py, tests/e2e/*) rely on the named
 records below; filler posts only pad out feeds and pagination.
 """
+import bz2
 import json
 import os
 import subprocess
@@ -98,6 +100,24 @@ COMMENTS = {
     ],
 }
 
+# Miniature of the 2015 Internet Archive corpus for gapfill_loader.py: two posts
+# the monthly dumps already have, recovered posts (one in a month with no table
+# yet), a duplicate, an excluded community and lines that can't be used.
+GAPFILL_CORPUS = [
+    SUBMISSIONS['2005-12'][0],
+    SUBMISSIONS['2006-01'][0],
+    post('b0aa', 'Recovered December post', 'reddit.com', 'frank', 42, ts(2005, 12, 20)),
+    # A nested "id" ahead of the post's own must not be mistaken for it
+    {'media': {'oembed': {'id': 'b001'}},
+     **post('b0ab', 'Recovered post with media', 'reddit.com', 'frank', 41, ts(2005, 12, 21))},
+    post('c0aa', 'Post from a community banned later', 'BannedIn2015', 'gina', 64, '1136505600.0'),
+    post('c0aa', 'Post from a community banned later', 'BannedIn2015', 'gina', 64, '1136505600.0'),
+    post('d0aa', 'Another banned community post', 'BannedIn2015', 'gina', 32, ts(2006, 2, 4)),
+    post('jb01', 'Excluded community post', 'jailbait', 'mallory', 10, ts(2006, 1, 7)),
+    post('f0aa', 'Post from a month without a table', 'reddit.com', 'frank', 5, ts(2007, 3, 1)),
+]
+GAPFILL_BAD_LINES = ['{oops', '{"title": "no id"}']
+
 BANNER = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E'
 
 SUBREDDIT_SNAPSHOTS = {
@@ -147,6 +167,10 @@ def main(out):
     os.makedirs(snapshot_dir, exist_ok=True)
     for name, records in SUBREDDIT_SNAPSHOTS.items():
         write_zst(os.path.join(snapshot_dir, name), [json.dumps(r) for r in records])
+    supplements = os.path.join(out, 'supplements')
+    os.makedirs(supplements, exist_ok=True)
+    with bz2.open(os.path.join(supplements, 'RS_full_corpus.bz2'), 'wt', encoding='utf-8') as f:
+        f.writelines(line + '\n' for line in [json.dumps(r) for r in GAPFILL_CORPUS] + GAPFILL_BAD_LINES)
     icon_dir = os.path.join(out, 'reddit', 'icons')
     os.makedirs(icon_dir, exist_ok=True)
     with open(os.path.join(icon_dir, 'programming.png'), 'wb') as f:

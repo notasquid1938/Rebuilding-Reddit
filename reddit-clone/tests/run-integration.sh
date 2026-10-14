@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Integration and end-to-end tests: loads tests/fixtures into an empty test
 # database with the real loaders, checks the result, then builds and starts the
-# website against it and runs the Playwright API and browser tests.
+# website against it and runs the Playwright API and browser tests. Finally
+# fills gaps from the fixture corpus (gapfill_loader.py) and checks that.
 #
 # With POSTGRES_HOST unset a throwaway postgres:15 container is started (needs
 # Docker). CI provides its own database. The database name must end in "_test".
@@ -73,3 +74,7 @@ for _ in $(seq 60); do curl -sf "http://127.0.0.1:$APP_PORT/api/AvailableDates" 
 
 echo "--- Website tests"
 BASE_URL="http://127.0.0.1:$APP_PORT" npx playwright test "$@" || { echo "--- App log"; tail -50 "$WORK/app.log"; exit 1; }
+
+# Last: it adds posts the tests above don't expect
+echo "--- Gap-fill tests"
+INTEGRATION=gapfill "$PYTHON" -m pytest tests/python -q -p no:cacheprovider

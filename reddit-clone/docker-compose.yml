@@ -91,6 +91,8 @@ services:
       - LOAD_COMMENTS=0
       # Delete RC_*.zst after a load with zero skipped rows
       - DELETE_LOADED_DUMPS=comments
+      # Fill 2006-2015 gaps once from the Internet Archive's 2015 corpus (42.7 GB download)
+      - GAPFILL=1
       # Check for newly published months daily
       - REFRESH_HOURS=24
       - ICON_RATE=20

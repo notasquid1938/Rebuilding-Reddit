@@ -28,7 +28,7 @@ jobs:
         run: npm test
       - name: Python
         run: |
-          pip install pytest psycopg2-binary requests
+          pip install pytest psycopg2-binary requests numpy
           python -m pytest tests/python -q
 
   integration:
@@ -63,10 +63,10 @@ jobs:
           python-version: '3.12'
       - name: Install dependencies
         run: |
-          sudo apt-get install -y zstd postgresql-client
+          sudo apt-get install -y zstd lbzip2 postgresql-client
           npm ci
           npx playwright install --with-deps chromium
-          pip install pytest psycopg2-binary requests
+          pip install pytest psycopg2-binary requests numpy
       - name: Run
         run: bash tests/run-integration.sh
       - name: Upload Playwright report

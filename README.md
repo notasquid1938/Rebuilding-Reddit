@@ -18,6 +18,7 @@ The website copies Reddit's current interface:
 flowchart LR
     AT["Academic Torrents<br/>(Arctic Shift / Watchful1 dumps)"] -->|fetch_dumps.py| Z[("Data/*.zst<br/>monthly dumps")]
     Z -->|dump_loader.py| PG[("PostgreSQL<br/>rs_YYYY_MM / rc_YYYY_MM")]
+    IA["Internet Archive<br/>2006–2015 corpus"] -->|gapfill_loader.py| PG
     SS["Subreddit snapshots<br/>(about pages)"] -->|subreddits_loader.py| PG
     PG -->|scrape_icons.py| IC["Data/reddit/icons<br/>(append-only)"]
     CDN["Reddit CDN"] --> IC
@@ -43,9 +44,10 @@ The loader keeps the archive complete without supervision. Each cycle (every `RE
    - a chunk that fails is bisected, so only the bad rows are skipped;
    - indexes are built, the table is made crash-safe (`SET LOGGED`), then swapped in atomically, so the site never shows a half-loaded month;
    - completed files are recorded in `loader_state`, so an interrupted run resumes where it stopped. Several months load in parallel.
-3. **Refresh lookup tables** (`scripts/site_tables.sql`, `scripts/build_subreddit_metadata.sql`): per-month id ranges, post counts per subreddit and month, each month's top 1000 posts, and the subreddit search index. With these, a thread lookup touches one month instead of hundreds, community feeds skip months where the community had no posts, and unfiltered "Top" pages read a small table.
-4. **Subreddits** (`subreddits_loader.py`): loads the about page of every subreddit (title, description, sidebar, members, creation date, icon and banner URLs) from Arctic Shift's subreddit snapshots (2024-01 and 2025-01, about 22 million communities; `u_` profile subreddits are skipped). Newer snapshots win, but a value that later disappeared, such as the icon of a since-banned community, keeps its last known version.
-5. **Icons** (`scrape_icons.py`): downloads each community's icon into `Data/reddit/icons/`, starting with the communities that have the most posts. It is **append-only**: an icon already on disk is never replaced or removed, so a community deleted from Reddit keeps the icon scraped while it existed. Failed downloads are retried after 30 days.
+3. **Fill gaps** (`gapfill_loader.py`, once): adds posts that the monthly dumps lack from the [Full Reddit Submission Corpus (2006 thru August 2015)](https://archive.org/details/FullRedditSubmissionCorpus2006ThruAugust2015), Jason Baumgartner's original 2014–15 crawl (42.7 GB, ~200 million posts). Pushshift later re-collected those years after some communities had been banned, so the monthly dumps cut, for example, the communities banned in 2015 off at the end of 2013. The corpus is downloaded in the background and checked against its published SHA-256; then only posts whose id isn't archived in any month are added. They're kept in `rs_extra` and merged into their months, and merged again if a month is ever reloaded. Communities banned for sexualising minors or for non-consensual images (`GAPFILL_EXCLUDE`) are never added. A report of what was recovered is written to `Data/supplements/RS_full_corpus.report.json`.
+4. **Refresh lookup tables** (`scripts/site_tables.sql`, `scripts/build_subreddit_metadata.sql`): per-month id ranges, post counts per subreddit and month, each month's top 1000 posts, and the subreddit search index. With these, a thread lookup touches one month instead of hundreds, community feeds skip months where the community had no posts, and unfiltered "Top" pages read a small table.
+5. **Subreddits** (`subreddits_loader.py`): loads the about page of every subreddit (title, description, sidebar, members, creation date, icon and banner URLs) from Arctic Shift's subreddit snapshots (2024-01 and 2025-01, about 22 million communities; `u_` profile subreddits are skipped). Newer snapshots win, but a value that later disappeared, such as the icon of a since-banned community, keeps its last known version.
+6. **Icons** (`scrape_icons.py`): downloads each community's icon into `Data/reddit/icons/`, starting with the communities that have the most posts. It is **append-only**: an icon already on disk is never replaced or removed, so a community deleted from Reddit keeps the icon scraped while it existed. Failed downloads are retried after 30 days.
 
 Everything is resumable. Stopping the containers, rebooting or killing a load mid-month loses nothing: the next cycle picks up where it stopped.
 
@@ -82,7 +84,7 @@ Directories next to `reddit-clone/`:
 
 | Path | Contents |
 | --- | --- |
-| `Data/` | Downloaded `.zst` dumps, subreddit snapshots (`Data/subreddits/`) and icons (`Data/reddit/icons/`) |
+| `Data/` | Downloaded `.zst` dumps, subreddit snapshots (`Data/subreddits/`), the gap-fill corpus (`Data/supplements/`) and icons (`Data/reddit/icons/`) |
 | `pg_archive/` | Postgres tablespace for loaded months. Point this volume at your largest disk in `docker-compose.yml` |
 
 The Postgres data volume itself (Docker volume `postgres_data`) holds the small lookup tables and any months loaded before the tablespace existed.
@@ -98,6 +100,8 @@ Set these on the `loader` service in `docker-compose.yml`:
 | `DELETE_LOADED_DUMPS` | `comments` | Kinds whose `.zst` is deleted after a load with zero skipped rows, to save space |
 | `LOADER_WORKERS` | `4` | Months loaded in parallel |
 | `LOADER_TABLESPACE` | `archive_hdd` | Tablespace for loaded months (created on the `pg_archive` volume) |
+| `GAPFILL` | `1` | `0` skips the 2006–2015 gap-fill corpus |
+| `GAPFILL_EXCLUDE` | `jailbait,preteen_girls,creepshots,thefappening,beatingwomen` | Communities the gap-fill never adds (comma list, replaces the default) |
 | `REFRESH_HOURS` | `24` | How often to check for newly published months |
 | `ICON_RATE` | `20` | Icon downloads per second |
 
@@ -116,6 +120,7 @@ And on the `reddit-clone` (website) service:
 | `rs_YYYY_MM` | Submissions for one month. Indexed by `id`, `(subreddit, score)`, `(author, created_utc)` and `score` |
 | `rc_YYYY_MM` | Comments for one month. Indexed by `parent_id` and `link_id` |
 | `loader_state` | Every dump file loaded, with row and skipped-row counts |
+| `rs_extra` | Posts recovered by the gap-fill, with their month; merged into `rs_YYYY_MM` |
 | `post_id_ranges` | Base-36 id range of each month, for thread lookups |
 | `subreddit_monthly` | Posts per subreddit per month |
 | `top_posts` | Top 1000 posts of each month |
@@ -141,11 +146,11 @@ Every pull request runs the full suite on GitHub Actions (`.github/workflows/ci.
 
 ```bash
 npm test                 # JavaScript unit tests (Vitest)
-npm run test:python      # loader unit tests (pytest; needs pytest + psycopg2)
+npm run test:python      # loader unit tests (pytest; needs pytest, psycopg2, requests and numpy)
 npm run test:integration # everything below, against a throwaway database
 ```
 
-The integration run generates a miniature archive (`tests/fixtures/build_fixtures.py`), loads it into an empty `*_test` database with the real loaders, checks the result, then builds and starts the website and runs the Playwright API and browser tests (`tests/e2e/`) on desktop and mobile. Without `POSTGRES_HOST` it starts its own `postgres:15` container; it refuses to touch a database whose name doesn't end in `_test`. Locally, `PW_CHANNEL=chrome` uses an installed Chrome instead of running `npx playwright install chromium`.
+The integration run generates a miniature archive (`tests/fixtures/build_fixtures.py`), loads it into an empty `*_test` database with the real loaders, checks the result, then builds and starts the website and runs the Playwright API and browser tests (`tests/e2e/`) on desktop and mobile. Last, it runs the gap-fill on a miniature corpus and checks what it added. Without `POSTGRES_HOST` it starts its own `postgres:15` container; it refuses to touch a database whose name doesn't end in `_test`. Locally, `PW_CHANNEL=chrome` uses an installed Chrome instead of running `npx playwright install chromium`.
 
 ## Long Term Goals
 - [x] Switch the database from MongoDB to PostgreSQL, so that anyone using *all* of Reddit's data doesn't hit a database bottleneck
@@ -156,4 +161,4 @@ The integration run generates a miniature archive (`tests/fixtures/build_fixture
 
 ## Credits
 
-The data comes from the Pushshift archives as redistributed and extended by [Watchful1](https://github.com/Watchful1/PushshiftDumps) and [RaiderBDev / Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift), via [Academic Torrents](https://academictorrents.com/). Reddit Rebuilt is an independent, non-commercial project, not affiliated with Reddit, Inc. Licensed under the GNU GPL v3.
+The data comes from the Pushshift archives as redistributed and extended by [Watchful1](https://github.com/Watchful1/PushshiftDumps) and [RaiderBDev / Arctic Shift](https://github.com/ArthurHeitmann/arctic_shift), via [Academic Torrents](https://academictorrents.com/), with gaps in 2006–2015 filled from Jason Baumgartner's original corpus on the [Internet Archive](https://archive.org/details/FullRedditSubmissionCorpus2006ThruAugust2015). Reddit Rebuilt is an independent, non-commercial project, not affiliated with Reddit, Inc. Licensed under the GNU GPL v3.

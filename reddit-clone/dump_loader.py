@@ -12,6 +12,8 @@ RC_YYYY-MM.zst comments) into monthly Postgres tables rs_YYYY_MM / rc_YYYY_MM.
   SET LOGGED (cheap under wal_level=minimal) so a crash can't empty them.
 - Completion is recorded in the loader_state table. A file is (re)loaded
   whenever it has no completed entry, so an interrupted run resumes cleanly.
+- Posts recovered from supplementary datasets (rs_extra, gapfill_loader.py)
+  are merged back into a submissions month whenever it is (re)loaded.
 
 Usage: python3 dump_loader.py submissions|comments
 Environment: DATA_DIR (default: current directory), LOADER_WORKERS (default 4),
@@ -119,6 +121,20 @@ def completed_files():
         done = {row[0] for row in cur.fetchall()}
     conn.close()
     return done
+
+
+def merge_extra(cur, table):
+    """Adds the month's posts recovered from supplementary datasets (rs_extra,
+    see gapfill_loader.py) that the table doesn't have. Returns how many."""
+    cur.execute("SELECT to_regclass('rs_extra') IS NOT NULL")
+    if not cur.fetchone()[0]:
+        return 0
+    cols = sql.SQL(', ').join(map(sql.Identifier, KINDS['submissions']['site_columns']))
+    cur.execute(sql.SQL(
+        'INSERT INTO {table} ({cols}) SELECT {cols} FROM rs_extra e '
+        "WHERE e.month = to_date(%s, 'YYYY_MM') AND NOT EXISTS (SELECT 1 FROM {table} t WHERE t.id = e.id)").format(
+            table=sql.Identifier(table), cols=cols), (table[3:],))
+    return cur.rowcount
 
 
 def tablespace_clause():
@@ -295,6 +311,10 @@ def load_file(job):
             for suffix, _ in spec['indexes']:
                 cur.execute(sql.SQL('ALTER INDEX {} RENAME TO {}').format(
                     sql.Identifier(f'{staging}_{suffix}'), sql.Identifier(f'{table}_{suffix}')))
+            if kind == 'submissions':
+                recovered = merge_extra(cur, table)
+                if recovered:
+                    print(f'[{table}] +{recovered:,} recovered posts from rs_extra', flush=True)
             cur.execute("""INSERT INTO loader_state (file, table_name, rows_loaded, rows_failed)
                            VALUES (%s, %s, %s, %s)
                            ON CONFLICT (file) DO UPDATE SET rows_loaded = EXCLUDED.rows_loaded,

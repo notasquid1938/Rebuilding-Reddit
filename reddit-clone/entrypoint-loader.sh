@@ -66,10 +66,22 @@ run_cycle() {
   python3 -u /app/fetch_dumps.py &
   fetch_pid=$!
 
+  # One-off supplementary dataset that fills gaps in 2006-2015 (gapfill_loader.py)
+  gapfill_pid=""
+  if [ "${GAPFILL:-1}" = "1" ]; then
+    python3 -u /app/gapfill_loader.py download &
+    gapfill_pid=$!
+  fi
+
   # Load what's on disk while the rest downloads, then load the new arrivals
   for kind in $KINDS; do python3 -u /app/dump_loader.py "$kind"; done
   wait "$fetch_pid"
   for kind in $KINDS; do python3 -u /app/dump_loader.py "$kind"; done
+
+  # After the monthly dumps, so it only adds what they don't have
+  if [ -n "$gapfill_pid" ] && wait "$gapfill_pid"; then
+    python3 -u /app/gapfill_loader.py load
+  fi
 
   echo "--- Refreshing site lookup tables ---"
   "${PSQL[@]}" -f /app/scripts/site_tables.sql -f /app/scripts/build_subreddit_metadata.sql
