@@ -25,8 +25,31 @@ def run(script, *args):
 
 
 @pytest.fixture(scope='module')
-def first_run():
+def dry_run():
+    output = run('gapfill_loader.py', 'check')
+    conn = connect()
+    with conn, conn.cursor() as cur:
+        cur.execute("SELECT to_regclass('rs_extra') IS NULL, (SELECT count(*) FROM rs_2005_12)")
+        untouched = cur.fetchone()
+    conn.close()
+    return output, untouched
+
+
+@pytest.fixture(scope='module')
+def first_run(dry_run):
     return run('gapfill_loader.py')
+
+
+def test_check_counts_without_writing(dry_run):
+    output, untouched = dry_run
+    assert '5 would be recovered, 1 excluded' in output
+    assert untouched == (True, 45)  # no rs_extra table, no merged posts
+    with open(os.path.join(os.environ['DATA_DIR'], 'supplements', 'RS_full_corpus.check.json')) as f:
+        report = json.load(f)
+    assert {k: report[k] for k in ('lines', 'present', 'added', 'duplicate', 'excluded', 'unparsable')} == {
+        'lines': 11, 'present': 2, 'added': 5, 'duplicate': 1, 'excluded': 1, 'unparsable': 2}
+    assert report['by_year'] == {'2005': 2, '2006': 2, '2007': 1}
+    assert report['excluded_by_subreddit'] == {'jailbait': 1}
 
 
 @pytest.fixture(scope='module')
