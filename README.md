@@ -5,11 +5,12 @@ Reddit Rebuilt is a self-hosted archive of Reddit: every post, comment and subre
 
 The website copies Reddit's current interface:
 
-- **Home feed**: top posts for any date range, with infinite scroll and a "browse by year" sidebar
-- **Communities** (`/r/<name>`): banner, icon, description, sidebar text, member count and the community's top posts, including communities that were later banned or made private
-- **Threads** (`/Thread/<id>`): full post, markdown, images, YouTube embeds, NSFW/spoiler blurring and threaded comments
-- **User pages** (`/User/<name>`): every archived post by an account, newest or top first
+- **Home feed**: posts for any date range sorted by Top, Controversial, Most comments, New or Old, with infinite scroll and a "browse by year" sidebar
+- **Communities** (`/r/<name>`): banner, icon, description, sidebar text, member count and the community's posts in the same sorts, including communities that were later banned or made private
+- **Threads** (`/Thread/<id>`): full post, markdown, images, YouTube embeds, NSFW/spoiler blurring and threaded comments sorted by Top, New, Old or Controversial
+- **User pages** (`/User/<name>`): every archived post by an account, in any of the feed sorts
 - **Search**: community autocomplete across every subreddit in the archive
+- **Controversial** is estimated: the dumps have no downvotes, so posts rank by how many comments they drew for their net score. Comments use the controversiality flag Reddit recorded
 - **Dark mode**, mobile layout and Reddit-style URLs: swap `reddit.com` for the site's domain in any `/r/<sub>/comments/<id>/…`, `/u/<name>` or `/user/<name>` link and it opens the archived copy
 
 ## How it works
