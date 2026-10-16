@@ -218,12 +218,13 @@ async function queryTopPosts(tables, limit, offset) {
 // scripts/site_tables.sql), which keeps each month's leading posts for each
 // sort; author feeds are small enough to sort directly.
 const ROLLUP_ORDER = {
+  // Communities only (version 2 rows); the front page's Top is top_posts
+  top: 'pscore DESC, pid DESC',
   controversial: 'controversy(pscore, pcomments) DESC, pid DESC',
   comments: 'pcomments DESC, pid DESC',
   new: 'pcreated DESC, pid DESC',
   old: 'pcreated ASC, pid ASC',
 };
-export const ROLLUP_SORTS = Object.keys(ROLLUP_ORDER);
 const MAX_ROLLUP_DEPTH = 10000;
 
 const commentCount = `(CASE WHEN num_comments ~ '^[0-9]{1,9}$' THEN num_comments::integer ELSE 0 END)`;
@@ -241,13 +242,13 @@ export class FeedNotReadyError extends Error {}
 // is exact up to the point where a month that had more posts than the rollup
 // kept runs out of kept posts; anything past that could be missing posts, so
 // the page stops there and is flagged `truncated`.
-async function queryRollup(subreddit, tables, sort, limit, offset) {
+async function queryRollup(subreddit, tables, sort, limit, offset, minVersion = 1) {
   if (!(await hasTable('feed_rollup'))) throw new FeedNotReadyError();
   const months = tables.map((t) => `${t.month}-01`);
   const db = await connectToDatabase();
   const { rows: covered } = await db.query(
-    "SELECT count(*)::int AS n FROM feed_rollup WHERE subreddit = '' AND month = ANY($1::date[])",
-    [months]
+    "SELECT count(*)::int AS n FROM feed_rollup WHERE subreddit = '' AND month = ANY($1::date[]) AND version >= $2",
+    [months, minVersion]
   );
   if (covered[0].n !== months.length) throw new FeedNotReadyError();
   if (offset >= MAX_ROLLUP_DEPTH) return Object.assign([], { truncated: true });
@@ -315,7 +316,16 @@ export async function queryPosts({ startDate, endDate, subreddit, author, sort =
     const top = await queryTopPosts(tables, limit, offset);
     if (top) return top;
   }
-  if (!author && ROLLUP_ORDER[sort]) return queryRollup(subreddit, tables, sort, limit, offset);
+  // A community's Top through the monthly indexes reads the leading post of
+  // every month (hundreds of random reads); use the rollup once it has Top
+  if (subreddit && !author && sort === 'top') {
+    try {
+      return await queryRollup(subreddit, tables, 'top', limit, offset, 2);
+    } catch (error) {
+      if (!(error instanceof FeedNotReadyError)) throw error;
+    }
+  }
+  if (!author && sort !== 'top' && ROLLUP_ORDER[sort]) return queryRollup(subreddit, tables, sort, limit, offset);
 
   const params = [];
   const where = [];

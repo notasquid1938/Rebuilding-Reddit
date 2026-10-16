@@ -110,7 +110,9 @@ END $$;
 -- feed_rollup: per subreddit per month (and per month for the front page,
 -- subreddit = ''), the posts that rank in the first `per_sub` (front page:
 -- `per_month`) for any of Controversial, Most comments, New or Old, with the
--- values those sorts need. A listing built from it is exact until some month
+-- values those sorts need. Version 2 rows also keep each community's Top
+-- posts: a community's all-time Top through the monthly indexes reads the
+-- leading post of every month, hundreds of random reads on the archive disk. A listing built from it is exact until some month
 -- with more posts than were kept has given up all of its kept posts for that
 -- sort; the website stops there (lib/submissions.js).
 CREATE TABLE IF NOT EXISTS feed_rollup (
@@ -124,6 +126,7 @@ CREATE TABLE IF NOT EXISTS feed_rollup (
   comments  integer[] NOT NULL,
   PRIMARY KEY (subreddit, month)
 );
+ALTER TABLE feed_rollup ADD COLUMN IF NOT EXISTS version smallint NOT NULL DEFAULT 1;
 
 -- Ranking keys; lib/submissions.js uses the same expressions. Controversial:
 -- Reddit's own ranking needs downvotes, which the dumps don't have, so it is
@@ -160,23 +163,24 @@ BEGIN
        FROM (SELECT %s id, score FROM %I WHERE id ~ ''^[0-9a-z]{1,12}$'') s', col_sql, tbl);
 
   DELETE FROM feed_rollup WHERE month = m;
-  INSERT INTO feed_rollup (subreddit, month, posts, kept, ids, created, scores, comments)
+  INSERT INTO feed_rollup (subreddit, month, posts, kept, ids, created, scores, comments, version)
   SELECT coalesce(subreddit, ''), m, max(n), per_sub, array_agg(base36_to_bigint(id)), array_agg(created),
-         array_agg(score), array_agg(comments)
+         array_agg(score), array_agg(comments), 2
     FROM (SELECT *, count(*) OVER w AS n,
                  row_number() OVER (w ORDER BY controversy(score, comments) DESC, id DESC) AS r1,
                  row_number() OVER (w ORDER BY comments DESC, id DESC) AS r2,
                  row_number() OVER (w ORDER BY created DESC, id DESC) AS r3,
-                 row_number() OVER (w ORDER BY created ASC, id ASC) AS r4
+                 row_number() OVER (w ORDER BY created ASC, id ASC) AS r4,
+                 row_number() OVER (w ORDER BY score DESC, id DESC) AS r5
             FROM feed_rollup_scan WHERE subreddit IS NOT NULL
           WINDOW w AS (PARTITION BY subreddit)) x
-   WHERE least(r1, r2, r3, r4) <= per_sub
+   WHERE least(r1, r2, r3, r4, r5) <= per_sub
    GROUP BY subreddit;
 
   -- Front page: every post of the month (LIMIT keeps these to cheap top-N sorts)
-  INSERT INTO feed_rollup (subreddit, month, posts, kept, ids, created, scores, comments)
+  INSERT INTO feed_rollup (subreddit, month, posts, kept, ids, created, scores, comments, version)
   SELECT '', m, (SELECT count(*) FROM feed_rollup_scan), per_month, array_agg(base36_to_bigint(id)),
-         array_agg(created), array_agg(score), array_agg(comments)
+         array_agg(created), array_agg(score), array_agg(comments), 2
     FROM ((SELECT id, created, score, comments FROM feed_rollup_scan
             ORDER BY controversy(score, comments) DESC, id DESC LIMIT per_month)
           UNION (SELECT id, created, score, comments FROM feed_rollup_scan ORDER BY comments DESC, id DESC LIMIT per_month)
