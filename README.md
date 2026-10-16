@@ -102,6 +102,7 @@ Set these on the `loader` service in `docker-compose.yml`:
 | `LOADER_COLUMNS` | `site` | `site` keeps only the fields the website shows (about ⅓ the size); `all` keeps every field in the dumps |
 | `DELETE_LOADED_DUMPS` | `submissions,comments` | Kinds whose `.zst` is deleted after a load with zero skipped rows, to save space |
 | `LOADER_WORKERS` | `4` | Months loaded in parallel |
+| `LOADER_COMMENTS_WORKERS` | `2` | Comment months loaded in parallel (each saturates a hard disk more than a post month; overrides `LOADER_WORKERS`) |
 | `LOADER_TABLESPACE` | `archive_hdd` | Tablespace for loaded months (created on the `pg_archive` volume) |
 | `GAPFILL` | `1` | `0` skips the 2006–2015 gap-fill corpus |
 | `GAPFILL_EXCLUDE` | `jailbait,preteen_girls,creepshots,thefappening,beatingwomen` | Communities the gap-fill never adds (comma list, replaces the default) |

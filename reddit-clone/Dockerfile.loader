@@ -21,7 +21,8 @@ WORKDIR /app
 
 RUN pip install --no-cache-dir psycopg2-binary requests numpy
 
-COPY dump_loader.py fetch_dumps.py subreddits_loader.py scrape_icons.py gapfill_loader.py entrypoint-loader.sh ./
+COPY dump_loader.py fetch_dumps.py subreddits_loader.py scrape_icons.py gapfill_loader.py supplements_loader.py \
+     entrypoint-loader.sh ./
 COPY scripts ./scripts
 
 RUN chmod +x entrypoint-loader.sh

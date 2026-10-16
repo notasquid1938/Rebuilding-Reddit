@@ -9,10 +9,14 @@ The tests (tests/python/test_integration.py, tests/e2e/*) rely on the named
 records below; filler posts only pad out feeds and pagination.
 """
 import bz2
+import csv
+import io
 import json
 import os
 import subprocess
 import sys
+import tarfile
+import zipfile
 import zlib
 import struct
 from datetime import datetime, timezone
@@ -121,6 +125,34 @@ GAPFILL_CORPUS = [
 ]
 GAPFILL_BAD_LINES = ['{oops', '{"title": "no id"}']
 
+# supplements_loader.py: a month of the 2013 scrape (Reddit's JSON, one post per line)
+SCRAPE_2013 = {
+    '2006-01': [
+        SUBMISSIONS['2006-01'][0],  # already archived
+        post('c0bb', 'Recovered by the 2013 scrape', 'reddit.com', 'harry', 77, ts(2006, 1, 9)),
+        post('jb02', 'Excluded community post', 'jailbait', 'mallory', 10, ts(2006, 1, 9)),
+    ],
+}
+# ...an archiver data zip (links.csv per day, no subreddit column: it comes from the path)...
+ARCHIVE_LINKS = [
+    ['author', 'created_utc', 'domain', 'id', 'is_self', 'num_comments', 'over_18', 'permalink', 'retrieved_on',
+     'score', 'selftext', 'stickied', 'subreddit_id', 'title', 'url'],
+    ['ivy', str(ts(2006, 2, 3)), 'self.BannedSub', 'd0bb', 'True', '4', 'False',
+     '/r/BannedSub/comments/d0bb/csv_post/', '0', '12', 'Body from the CSV', 'False', 't5_x', 'Recovered from a CSV',
+     ''],
+    ['bob', str(ts(2006, 2, 3)), 'example.com', 'd001', 'False', '0', 'False', '/r/programming/comments/d001/x/',
+     '0', '100', '', 'False', 't5_y', 'February programming post', 'https://example.com/d001'],
+]
+# ...and an archive that only kept the archiver's HTML pages
+ARCHIVE_PAGE = '''<html><body><main role="main" class="container-fluid">
+      <div class="submission pt-3" data-id="d0cc">
+        <h3 class="title"><a href="https://example.com/page">Recovered from &amp; HTML</a></h3>
+        <p><span class="badge badge-primary">9</span>&nbsp;&nbsp;2006-02-05 by <a class="author" href="../user/jack.html">jack</a></p>
+      </div>
+      <div class="comments">
+        <h5>3 comments</h5>
+      </div></main></body></html>'''
+
 BANNER = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22/%3E'
 
 SUBREDDIT_SNAPSHOTS = {
@@ -174,6 +206,25 @@ def main(out):
     os.makedirs(supplements, exist_ok=True)
     with bz2.open(os.path.join(supplements, 'RS_full_corpus.bz2'), 'wt', encoding='utf-8') as f:
         f.writelines(line + '\n' for line in [json.dumps(r) for r in GAPFILL_CORPUS] + GAPFILL_BAD_LINES)
+    scrape_dir = os.path.join(supplements, 'scrape2013')
+    os.makedirs(scrape_dir, exist_ok=True)
+    for month, records in SCRAPE_2013.items():
+        data = ''.join(json.dumps(r) + '\n' for r in records).encode('utf-8')
+        with tarfile.open(os.path.join(scrape_dir, f'Posts_{month}.json.tar.gz'), 'w:gz') as tar:
+            info = tarfile.TarInfo(f'./Posts_{month}.json')
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    csv_item = os.path.join(supplements, 'archives', 'BannedSub_subreddit')
+    os.makedirs(csv_item, exist_ok=True)
+    with zipfile.ZipFile(os.path.join(csv_item, 'BannedSub-data.zip'), 'w') as z:
+        text = io.StringIO()
+        csv.writer(text).writerows(ARCHIVE_LINKS)
+        z.writestr('data/BannedSub/2006/02/03/links.csv', text.getvalue())
+    html_item = os.path.join(supplements, 'archives', 'HtmlSub_archive')
+    os.makedirs(html_item, exist_ok=True)
+    with zipfile.ZipFile(os.path.join(html_item, 'HtmlSub-archive.zip'), 'w') as z:
+        z.writestr('r/HtmlSub/comments/d/0/c/c/recovered_from_html.html', ARCHIVE_PAGE)
+        z.writestr('r/index.html', '<html></html>')
     icon_dir = os.path.join(out, 'reddit', 'icons')
     os.makedirs(icon_dir, exist_ok=True)
     with open(os.path.join(icon_dir, 'programming.png'), 'wb') as f:

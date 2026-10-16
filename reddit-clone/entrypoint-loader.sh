@@ -83,6 +83,10 @@ run_cycle() {
   if [ -n "$gapfill_pid" ] && wait "$gapfill_pid"; then
     python3 -u /app/gapfill_loader.py load
   fi
+  # Posts from the 2013 scrape and community archives (supplements_loader.py)
+  if [ "${SUPPLEMENTS:-1}" = "1" ]; then
+    python3 -u /app/supplements_loader.py
+  fi
 
   echo "--- Refreshing site lookup tables ---"
   "${PSQL[@]}" -f /app/scripts/site_tables.sql -f /app/scripts/build_subreddit_metadata.sql

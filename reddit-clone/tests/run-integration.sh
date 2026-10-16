@@ -78,3 +78,6 @@ BASE_URL="http://127.0.0.1:$APP_PORT" npx playwright test "$@" || { echo "--- Ap
 # Last: it adds posts the tests above don't expect
 echo "--- Gap-fill tests"
 INTEGRATION=gapfill "$PYTHON" -m pytest tests/python -q -p no:cacheprovider
+
+echo "--- Supplement tests"
+INTEGRATION=supplements "$PYTHON" -m pytest tests/python -q -p no:cacheprovider

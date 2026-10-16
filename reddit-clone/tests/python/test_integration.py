@@ -159,14 +159,20 @@ def test_banned_subreddit_kept_with_name_only(db):
     assert one(db, "SELECT title, subscribers FROM subreddit_about WHERE name = 'GoneSub'") == (None, None)
 
 
-def run_loader(*args):
-    env = dict(os.environ, LOADER_WORKERS='2')
+def run_loader(*args, **env_overrides):
+    env = dict(os.environ, LOADER_WORKERS='2', **env_overrides)
     return subprocess.run([sys.executable, os.path.join(ROOT, 'dump_loader.py'), *args],
                           env=env, capture_output=True, text=True, check=True).stdout
 
 
 def test_rerun_is_a_no_op():
     assert 'submissions: 0 file(s) to load' in run_loader('submissions')
+
+
+def test_worker_count_per_kind():
+    output = run_loader('comments', LOADER_COMMENTS_WORKERS='1')
+    assert 'comments: 0 file(s) to load with 1 worker(s)' in output
+    assert 'with 2 worker(s)' in run_loader('submissions', LOADER_COMMENTS_WORKERS='1')
 
 
 def test_month_reloads_in_place(db):

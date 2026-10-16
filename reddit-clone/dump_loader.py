@@ -16,7 +16,8 @@ RC_YYYY-MM.zst comments) into monthly Postgres tables rs_YYYY_MM / rc_YYYY_MM.
   are merged back into a submissions month whenever it is (re)loaded.
 
 Usage: python3 dump_loader.py submissions|comments
-Environment: DATA_DIR (default: current directory), LOADER_WORKERS (default 4),
+Environment: DATA_DIR (default: current directory), LOADER_WORKERS (default 4;
+LOADER_SUBMISSIONS_WORKERS / LOADER_COMMENTS_WORKERS override it per kind),
 LOADER_COLUMNS (site = only what the website reads, default; all = every field),
 LOADER_TABLESPACE (optional Postgres tablespace for new tables),
 DELETE_LOADED_DUMPS (comma list of kinds whose .zst is deleted after a clean
@@ -419,13 +420,14 @@ def main():
     ensure_state_table()
     done = completed_files()
     prefix = KINDS[kind]['prefix']
+    workers = max(1, int(os.getenv(f'LOADER_{kind.upper()}_WORKERS', WORKERS)))
     pending = sorted(f for f in os.listdir(DATA_DIR)
                      if FILE_RE.match(f) and f.startswith(prefix) and f not in done)
-    print(f'{kind}: {len(pending)} file(s) to load with {WORKERS} worker(s), columns={COLUMN_MODE}', flush=True)
+    print(f'{kind}: {len(pending)} file(s) to load with {workers} worker(s), columns={COLUMN_MODE}', flush=True)
     if not pending:
         return
     reserved, lock = multiprocessing.Value('d', 0.0, lock=False), multiprocessing.Lock()
-    with multiprocessing.Pool(WORKERS, initializer=init_worker, initargs=(reserved, lock)) as pool:
+    with multiprocessing.Pool(workers, initializer=init_worker, initargs=(reserved, lock)) as pool:
         results = pool.map(load_file, [(kind, f) for f in pending], chunksize=1)
     no_space = [table for table, loaded, why in results if loaded is None and why == 'no space']
     failures = [table for table, loaded, why in results if loaded is None and why != 'no space']
