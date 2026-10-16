@@ -8,11 +8,13 @@ import { AboutArchiveCard, TopCommunitiesCard, SidebarFooter } from '@/component
 import { DEFAULT_RANGE, SITE_NAME } from '@/lib/site';
 import { monthLabel } from '@/lib/format';
 import { rangeFromQuery, rangeToQuery } from '@/lib/range';
+import { FEED_SORTS, sortFromQuery, withSort } from '@/lib/sorts';
 
 function HomePage() {
   const router = useRouter();
   const range = router.isReady ? rangeFromQuery(router.query, DEFAULT_RANGE) : DEFAULT_RANGE;
-  const feedQuery = { startDate: range?.from, endDate: range?.to, sort: 'top' };
+  const sort = router.isReady ? sortFromQuery(router.query, 'top') : 'top';
+  const feedQuery = { startDate: range?.from, endDate: range?.to, sort };
   const rangeTitle = range ? `${monthLabel(range.from)} – ${monthLabel(range.to)}` : 'All time';
 
   return (
@@ -33,9 +35,11 @@ function HomePage() {
       </Head>
 
       <FeedControls
-        sort="top"
+        sort={sort}
+        sorts={FEED_SORTS}
+        onSortChange={(next) => router.push({ pathname: '/', query: withSort(router.query, next, 'top') })}
         range={range}
-        onRangeChange={(next) => router.push({ pathname: '/', query: rangeToQuery(next) })}
+        onRangeChange={(next) => router.push({ pathname: '/', query: withSort(rangeToQuery(next), sort, 'top') })}
       />
       <hr />
       {router.isReady ? (

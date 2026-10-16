@@ -10,6 +10,7 @@ import { addRecentCommunity } from '@/lib/hooks';
 import { formatCount, monthLabel } from '@/lib/format';
 import { rangeFromQuery, rangeToQuery } from '@/lib/range';
 import { SITE_NAME } from '@/lib/site';
+import { FEED_SORTS, sortFromQuery, withSort } from '@/lib/sorts';
 import styles from '@/styles/Profile.module.css';
 
 export async function getServerSideProps({ params, res }) {
@@ -66,15 +67,20 @@ const CommunityBanner = ({ name, info }) => {
 function CommunityPage({ name, info }) {
   const router = useRouter();
   const range = rangeFromQuery(router.query, null);
-  const feedQuery = { subreddit: name, startDate: range?.from, endDate: range?.to, sort: 'top' };
+  const sort = sortFromQuery(router.query, 'top');
+  const feedQuery = { subreddit: name, startDate: range?.from, endDate: range?.to, sort };
 
   useEffect(() => {
     if (info?.posts) addRecentCommunity(name);
   }, [name, info]);
 
   const setRange = (next) => {
-    const query = { name, ...(next ? rangeToQuery(next) : {}) };
+    const query = withSort({ name, ...(next ? rangeToQuery(next) : {}) }, sort, 'top');
     router.push({ pathname: '/r/[name]', query }, undefined, { shallow: true });
+  };
+
+  const setSort = (next) => {
+    router.push({ pathname: '/r/[name]', query: withSort(router.query, next, 'top') }, undefined, { shallow: true });
   };
 
   return (
@@ -97,7 +103,7 @@ function CommunityPage({ name, info }) {
         <meta property="og:title" content={`r/${name}`} />
       </Head>
 
-      <FeedControls sort="top" range={range} onRangeChange={setRange} />
+      <FeedControls sort={sort} sorts={FEED_SORTS} onSortChange={setSort} range={range} onRangeChange={setRange} />
       <hr />
       <Feed
         key={JSON.stringify(feedQuery)}

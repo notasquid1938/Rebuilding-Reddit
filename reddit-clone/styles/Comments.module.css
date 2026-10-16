@@ -16,6 +16,30 @@
   font-weight: 600;
 }
 
+.sortSelect {
+  margin-left: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sortSelect option {
+  background: var(--bg-elevated);
+  color: var(--text-strong);
+}
+
+.controversial {
+  color: var(--upvote);
+  font-weight: 700;
+  font-size: 14px;
+  margin-left: -4px;
+}
+
 .placeholder {
   padding: 24px 0;
   color: var(--text-weak);

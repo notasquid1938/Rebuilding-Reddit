@@ -32,6 +32,24 @@ test.describe('Home', () => {
     await expect(page.getByText(FIXTURE.topPost.title)).toHaveCount(0);
   });
 
+  test('sort menu switches the feed and keeps the range', async ({ page }) => {
+    await page.goto('/?from=2005-12&to=2005-12');
+    await feedTitles(page);
+    await page.getByRole('button', { name: 'Top' }).click();
+    await page.getByRole('option', { name: 'Controversial' }).click();
+    await expect(page).toHaveURL(/from=2005-12&to=2005-12&sort=controversial/);
+    await expect(page.getByRole('button', { name: 'Controversial' })).toBeVisible();
+    await expect(page.locator('article h2, article h3').first()).toHaveText(FIXTURE.nsfwPost.title);
+  });
+
+  test('sort from the URL survives a range change', async ({ page }) => {
+    await page.goto('/?sort=new&t=all');
+    expect((await feedTitles(page))[0]).toBe(FIXTURE.laterPost.title);
+    await page.getByRole('button', { name: 'All time' }).click();
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page).toHaveURL(/sort=new/);
+  });
+
   test('all time', async ({ page }) => {
     await page.goto('/?t=all');
     const titles = await feedTitles(page);
@@ -73,6 +91,18 @@ test.describe('Thread', () => {
     await expect(comments.getByText('Nested reply')).toBeVisible();
     await expect(comments.getByText('Late comment from January')).toBeVisible();
     await expect(comments.getByText('OP', { exact: true })).toBeVisible();
+  });
+
+  test('sorts comments and marks controversial ones', async ({ page }) => {
+    await page.goto(`/Thread/${FIXTURE.topPost.id}`);
+    const comments = page.getByRole('region', { name: 'Comments' });
+    await expect(comments.getByText('First top-level comment')).toBeVisible();
+    await comments.getByRole('combobox').selectOption('new');
+    await expect(comments.locator('[id^="t1_"]').first()).toContainText('Late comment from January');
+    await comments.getByRole('combobox').selectOption('controversial');
+    const first = comments.locator('[id^="t1_"]').first();
+    await expect(first).toContainText('A divisive take');
+    await expect(first.getByTitle(/Controversial/)).toBeVisible();
   });
 
   test('collapses a comment thread', async ({ page }) => {
@@ -141,6 +171,15 @@ test.describe('Community', () => {
     expect(hit).toContain('SubredditIcons?subreddit=programming');
   });
 
+  test('sorts the community feed', async ({ page }) => {
+    await page.goto('/r/programming?sort=comments');
+    expect((await feedTitles(page))[0]).toBe(FIXTURE.selfPost.title);
+    await page.getByRole('button', { name: 'Most comments' }).click();
+    await page.getByRole('option', { name: 'New' }).click();
+    await expect(page).toHaveURL(/\/r\/programming\?sort=new$/);
+    await expect(page.locator('article h2, article h3').first()).toHaveText('February programming post');
+  });
+
   test('canonicalises the name', async ({ page }) => {
     await page.goto('/r/PROGRAMMING');
     await expect(page).toHaveURL(/\/r\/programming$/);
@@ -168,6 +207,12 @@ test.describe('User', () => {
   test('top sort', async ({ page }) => {
     await page.goto('/User/alice?sort=top');
     expect((await feedTitles(page))[0]).toBe(FIXTURE.topPost.title);
+  });
+
+  test('old sort', async ({ page }) => {
+    await page.goto('/User/alice?sort=old');
+    expect((await feedTitles(page))[0]).toBe(FIXTURE.topPost.title);
+    expect((await feedTitles(page))[1]).toBe('January winner');
   });
 });
 

@@ -23,6 +23,20 @@ BEGIN
     CALL refresh_month(t);
     COMMIT;
   END LOOP;
+  -- Months summarised before feed_rollup existed
+  FOR t IN
+    SELECT c.relname FROM pg_class c
+     WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r'
+       AND c.relname ~ '^rs_\d{4}_\d{2}$'
+       AND pg_relation_size(c.oid) > 0
+       AND NOT EXISTS (SELECT 1 FROM feed_rollup f
+                        WHERE f.subreddit = '' AND f.month = to_date(substr(c.relname, 4), 'YYYY_MM'))
+     ORDER BY c.relname
+  LOOP
+    RAISE NOTICE '% building feed_rollup for %', clock_timestamp(), t;
+    CALL refresh_feed_rollup(t);
+    COMMIT;
+  END LOOP;
 END $$;
 
 BEGIN;
@@ -44,4 +58,5 @@ COMMIT;
 ANALYZE post_id_ranges;
 ANALYZE subreddit_monthly;
 ANALYZE top_posts;
+ANALYZE feed_rollup;
 ANALYZE subreddits_metadata;

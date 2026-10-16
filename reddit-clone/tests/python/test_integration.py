@@ -97,6 +97,43 @@ def test_top_posts(db):
     assert one(db, 'SELECT count(*) FROM top_posts')[0] == 45 + 32 + 11 + 6
 
 
+def test_feed_rollup_covers_every_month(db):
+    assert one(db, "SELECT count(*) FROM feed_rollup WHERE subreddit = ''")[0] == len(MONTHS)
+    assert one(db, "SELECT posts, kept, cardinality(ids) FROM feed_rollup WHERE subreddit = '' AND month = '2005-12-01'") \
+        == (45, 1000, 45)
+    db.execute("SELECT subreddit, posts FROM feed_rollup WHERE month = '2005-12-01' AND subreddit <> '' ORDER BY 1")
+    assert db.fetchall() == [('pics', 1), ('programming', 15), ('reddit.com', 16), ('science', 13)]
+
+
+def rollup_ids(db, subreddit):
+    db.execute("""SELECT array(SELECT base36_to_bigint(x) FROM unnest(%s::text[]) x ORDER BY 1),
+                         array(SELECT unnest(ids) ORDER BY 1)
+                    FROM feed_rollup WHERE subreddit = %s AND month = '2005-12-01'""", (EXPECTED[subreddit], subreddit))
+    return db.fetchone()
+
+
+# With 2 kept per subreddit and 3 for the front page, the leaders of each sort:
+EXPECTED = {
+    # Controversial and Most comments: b002 then the highest id among ties at
+    # 0 comments (b111); New: b005, b002; Old: the first fillers b101, b104
+    'programming': ['b002', 'b111', 'b005', 'b101', 'b104'],
+    # Controversial / Most comments: b003, b002, b001; New: b005, b003, b002; Old: b100-b102
+    '': ['b001', 'b002', 'b003', 'b005', 'b100', 'b101', 'b102'],
+}
+
+
+def test_feed_rollup_keeps_the_leaders_of_each_sort(db):
+    db.execute("CALL refresh_feed_rollup('rs_2005_12', 2, 3)")
+    try:
+        for subreddit in EXPECTED:
+            expected, kept = rollup_ids(db, subreddit)
+            assert kept == expected, subreddit
+        assert one(db, "SELECT posts, kept FROM feed_rollup WHERE subreddit = 'programming' AND month = '2005-12-01'") \
+            == (15, 2)
+    finally:
+        db.execute("CALL refresh_feed_rollup('rs_2005_12')")
+
+
 def test_subreddits_metadata(db):
     row = one(db, "SELECT entry_count, first_seen, last_seen, post_count FROM subreddits_metadata WHERE name = 'programming'")
     assert row[0] == 3

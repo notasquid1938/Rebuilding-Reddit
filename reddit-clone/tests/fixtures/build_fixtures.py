@@ -55,10 +55,12 @@ SUBMISSIONS = {
     '2005-12': [
         post('b001', 'Top &amp; best post of December', 'reddit.com', 'alice', 5000, ts(2005, 12, 10),
              num_comments=5, url='https://example.com/article', domain='example.com'),
-        post('b002', 'What is &lt;markdown&gt;?', 'programming', 'bob', 300, ts(2005, 12, 11),
+        post('b002', 'What is &lt;markdown&gt;?', 'programming', 'bob', 300, ts(2005, 12, 11), num_comments=40,
              is_self=True, url='https://reddit.com/r/programming/comments/b002/', domain='self.programming',
              selftext='Line one\n\n**bold** text,\ta tab and a NUL\u0000 char &amp;gt; quoted'),
-        post('b003', 'NSFW spoiler post', 'pics', 'carol', 200, ts(2005, 12, 12), over_18=True, spoiler=True),
+        # Many comments for little score: the most controversial
+        post('b003', 'NSFW spoiler post', 'pics', 'carol', 200, ts(2005, 12, 12), over_18=True, spoiler=True,
+             num_comments=900),
         # Strings where numbers are expected, as in some old dumps
         post('b004', 'Deleted author post', 'reddit.com', '[deleted]', '150', '1134000000.0'),
         post('b005', 'Locked stickied flaired post', 'programming', 'bob', 120, ts(2005, 12, 13),

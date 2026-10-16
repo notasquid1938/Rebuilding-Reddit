@@ -7,6 +7,7 @@ import UserAvatar from '@/components/UserAvatar';
 import { UserCard, SidebarFooter } from '@/components/Sidebar';
 import { PostSkeleton } from '@/components/PostCard';
 import { SITE_NAME } from '@/lib/site';
+import { USER_SORTS, sortFromQuery, withSort } from '@/lib/sorts';
 import styles from '@/styles/Profile.module.css';
 
 const AUTHOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -14,14 +15,12 @@ const AUTHOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
 function UserPage() {
   const router = useRouter();
   const { name } = router.query;
-  const sort = router.query.sort === 'top' ? 'top' : 'new';
+  const sort = sortFromQuery(router.query, 'new', USER_SORTS);
   const valid = typeof name === 'string' && AUTHOR_RE.test(name);
   const feedQuery = { author: name, sort };
 
   const setSort = (next) => {
-    router.push({ pathname: '/User/[name]', query: next === 'new' ? { name } : { name, sort: next } }, undefined, {
-      shallow: true,
-    });
+    router.push({ pathname: '/User/[name]', query: withSort({ name }, next, 'new') }, undefined, { shallow: true });
   };
 
   return (
@@ -54,7 +53,7 @@ function UserPage() {
             </span>
           </nav>
 
-          <FeedControls sort={sort} sorts={['new', 'top']} onSortChange={setSort} />
+          <FeedControls sort={sort} sorts={USER_SORTS} onSortChange={setSort} />
           <hr />
           <Feed
             key={JSON.stringify(feedQuery)}
