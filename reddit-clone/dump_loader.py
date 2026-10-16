@@ -141,7 +141,12 @@ def merge_extra(cur, table):
     cur.execute("SELECT to_regclass('rs_extra') IS NOT NULL")
     if not cur.fetchone()[0]:
         return 0
-    cols = sql.SQL(', ').join(map(sql.Identifier, KINDS['submissions']['site_columns']))
+    # Months loaded by older versions only have the columns their dump's first
+    # line had (rs_2011_01 has no "spoiler"); recovered posts fill those
+    cur.execute('SELECT attname FROM pg_attribute WHERE attrelid = %s::regclass AND attnum > 0 AND NOT attisdropped',
+                (table,))
+    present = {row[0] for row in cur.fetchall()}
+    cols = sql.SQL(', ').join(sql.Identifier(c) for c in KINDS['submissions']['site_columns'] if c in present)
     cur.execute(sql.SQL(
         'INSERT INTO {table} ({cols}) SELECT {cols} FROM rs_extra e '
         "WHERE e.month = to_date(%s, 'YYYY_MM') AND NOT EXISTS (SELECT 1 FROM {table} t WHERE t.id = e.id)").format(
