@@ -32,7 +32,7 @@ def one(cur, query, params=None):
 def test_every_month_loaded_with_expected_counts(db):
     db.execute("SELECT file, rows_loaded, rows_failed FROM loader_state WHERE file LIKE 'R%' ORDER BY file")
     assert db.fetchall() == [
-        ('RC_2005-12.zst', 4, 0),
+        ('RC_2005-12.zst', 5, 0),
         ('RC_2006-01.zst', 1, 0),
         ('RS_2005-12.zst', 45, 2),  # the two malformed lines are counted, not loaded
         ('RS_2006-01.zst', 32, 0),
@@ -61,6 +61,11 @@ def test_values_survive_the_round_trip(db):
     assert selftext == 'Line one\n\n**bold** text,\ta tab and a NUL char &amp;gt; quoted'
     assert (score, created) == (300, 1134259200)
     assert one(db, "SELECT title FROM rs_2006_01 WHERE id = 'c002'")[0] == 'Title with\ta tab and\nnewline'
+
+
+def test_comment_controversiality_stored_as_a_number(db):
+    db.execute("SELECT id, controversiality FROM rc_2005_12 WHERE id IN ('k001', 'k005') ORDER BY id")
+    assert db.fetchall() == [('k001', 0), ('k005', 1)]
 
 
 def test_string_numbers_converted(db):

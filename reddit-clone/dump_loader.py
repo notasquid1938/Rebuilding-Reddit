@@ -50,7 +50,7 @@ SPACE_POLL_SECONDS = 60
 SAMPLE_LINES = 50000
 CHUNK_ROWS = 100000
 
-NUMERIC_COLUMNS = {'score', 'created_utc', 'ups', 'downs'}
+NUMERIC_COLUMNS = {'score', 'created_utc', 'ups', 'downs', 'controversiality'}
 
 KINDS = {
     'submissions': {
@@ -75,7 +75,8 @@ KINDS = {
         'prefix': 'RC',
         'table_prefix': 'rc',
         'site_columns': ['id', 'parent_id', 'link_id', 'author', 'body', 'subreddit', 'subreddit_id', 'score',
-                         'created_utc', 'distinguished', 'edited', 'stickied', 'author_flair_text'],
+                         'created_utc', 'distinguished', 'edited', 'stickied', 'author_flair_text',
+                         'controversiality'],
         'peak_space': 5.0,
         'indexes': [
             ('parent_id_index', '(parent_id)'),

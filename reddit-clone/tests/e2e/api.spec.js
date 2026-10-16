@@ -101,7 +101,7 @@ test.describe('Comments', () => {
   test('builds the tree across monthly tables', async ({ request }) => {
     const { available, comments } = await get(request, '/api/Comments?id=b001&month=2005-12');
     expect(available).toBe(true);
-    expect(comments.map((c) => c.id)).toEqual(['k001', 'm001', 'k004']);
+    expect(comments.map((c) => c.id)).toEqual(['k001', 'm001', 'k004', 'k005']);
     expect(comments[0].replies[0]).toMatchObject({ id: 'k002', author: 'alice' });
     expect(comments[0].replies[0].replies[0]).toMatchObject({ id: 'k003', body: 'Nested reply' });
     expect(comments[2]).toMatchObject({ author: '[deleted]', body: '[removed]' });
@@ -109,7 +109,7 @@ test.describe('Comments', () => {
 
   test('pages top-level comments', async ({ request }) => {
     const { comments } = await get(request, '/api/Comments?id=b001&month=2005-12&page=2&commentsPerPage=2');
-    expect(comments.map((c) => c.id)).toEqual(['k004']);
+    expect(comments.map((c) => c.id)).toEqual(['k004', 'k005']);
   });
 
   test('reports months without comment dumps', async ({ request }) => {
@@ -117,7 +117,7 @@ test.describe('Comments', () => {
   });
 
   test('counts comments', async ({ request }) => {
-    expect(await get(request, '/api/CommentCount?id=b001&month=2005-12')).toEqual({ available: true, totalComments: 5 });
+    expect(await get(request, '/api/CommentCount?id=b001&month=2005-12')).toEqual({ available: true, totalComments: 6 });
   });
 
   test('loads replies', async ({ request }) => {

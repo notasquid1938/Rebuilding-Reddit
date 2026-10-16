@@ -81,10 +81,10 @@ SUBMISSIONS = {
 BAD_LINES = {'2005-12': ['{not json', '[1, 2, 3]']}
 
 
-def comment(id, parent, body, author, score, created):
+def comment(id, parent, body, author, score, created, **extra):
     return {'id': id, 'parent_id': parent, 'link_id': 't3_b001', 'body': body, 'author': author,
             'score': score, 'created_utc': created, 'subreddit': 'reddit.com', 'subreddit_id': 't5_reddit.com',
-            'distinguished': None, 'edited': False, 'stickied': False}
+            'distinguished': None, 'edited': False, 'stickied': False, 'controversiality': 0, **extra}
 
 
 COMMENTS = {
@@ -93,6 +93,7 @@ COMMENTS = {
         comment('k002', 't1_k001', 'Reply from OP', 'alice', 20, ts(2005, 12, 10, 2)),
         comment('k003', 't1_k002', 'Nested reply', 'dave', 5, ts(2005, 12, 10, 3)),
         comment('k004', 't3_b001', '[removed]', '[deleted]', 10, ts(2005, 12, 10, 4)),
+        comment('k005', 't3_b001', 'A divisive take', 'frank', 2, ts(2005, 12, 10, 5), controversiality=1),
     ],
     # Comments arrive in later months' dumps too
     '2006-01': [
