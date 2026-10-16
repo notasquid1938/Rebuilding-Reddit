@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import { Reddit_Sans } from 'next/font/google';
 import { resolveLanding } from '@/lib/navigation';
+// Bundled from npm rather than fetched from Google Fonts at build time, which
+// made builds fail whenever that request did
+import '@fontsource-variable/reddit-sans';
 import '../styles/globals.css';
-
-const redditSans = Reddit_Sans({ subsets: ['latin'], display: 'swap', weight: ['400', '500', '600', '700', '800'] });
 
 function MyApp({ Component, pageProps }) {
   const router = useRouter();
@@ -19,11 +19,6 @@ function MyApp({ Component, pageProps }) {
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
-      <style jsx global>{`
-        :root {
-          --font-reddit-sans: ${redditSans.style.fontFamily};
-        }
-      `}</style>
       <Component {...pageProps} />
     </>
   );
