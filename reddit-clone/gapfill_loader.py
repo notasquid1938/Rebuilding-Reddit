@@ -18,8 +18,10 @@ the monthly dumps loaded is changed.
 - Completion is recorded in loader_state; reruns are a no-op. An interrupted
   run resumes: rows already in rs_extra count as archived and merging is
   idempotent.
+- `check` is a dry run: it counts what a load would recover, writes
+  RS_full_corpus.check.json and changes nothing in the database.
 
-Usage: python3 gapfill_loader.py [download|load|all]   (default all)
+Usage: python3 gapfill_loader.py [download|load|all|check]   (default all)
 Environment: DATA_DIR, GAPFILL_URL, GAPFILL_SHA256 (empty = skip the check),
 GAPFILL_EXCLUDE (comma list, replaces the default), plus the POSTGRES_* variables.
 """
@@ -199,13 +201,13 @@ def month_tables(cur):
 
 
 def archived_ids(conn, tables):
-    """Every id in the pre-2016 months plus rs_extra, read from the id indexes."""
+    """Every id in the given tables, read from their id indexes."""
     started = time.time()
     chunks = []
     with conn.cursor() as cur:
         cur.execute('SET enable_seqscan = off')  # the id index is a fraction of the table
         cur.execute('SET enable_bitmapscan = off')
-        for table in tables + ['rs_extra']:
+        for table in tables:
             cur.execute(sql.SQL('SELECT id FROM {} WHERE id IS NOT NULL').format(sql.Identifier(table)))
             values = [v for v in (to_int(row[0]) for row in cur.fetchall()) if v is not None]
             chunks.append(np.array(values, dtype=np.int64))
@@ -217,8 +219,9 @@ def archived_ids(conn, tables):
     return ids
 
 
-def collect(conn, archived, stats):
-    """Streams the corpus's posts that the archive lacks into rs_extra."""
+def collect(conn, archived, stats, write=True):
+    """Streams the corpus's posts that the archive lacks into rs_extra
+    (or, with write=False, only counts them)."""
     added_ids = set()
     chunk = []
 
@@ -247,12 +250,16 @@ def collect(conn, archived, stats):
             return
         if is_excluded(record):
             stats['excluded'] += 1
+            stats['excluded_by_subreddit'][str(record.get('subreddit')).lower()] += 1
             return
         added_ids.add(value)
-        record = dict(record, month=f"{month.replace('_', '-')}-01")
-        chunk.append(encode_row(record, EXTRA_COLUMNS, NUMERIC_FLAGS)[:-1] + f'\t{FILENAME}\n')
         stats['by_year'][month[:4]] += 1
         stats['by_subreddit'][str(record.get('subreddit'))] += 1
+        if not write:
+            stats['added'] += 1
+            return
+        record = dict(record, month=f"{month.replace('_', '-')}-01")
+        chunk.append(encode_row(record, EXTRA_COLUMNS, NUMERIC_FLAGS)[:-1] + f'\t{FILENAME}\n')
         if len(chunk) >= CHUNK_ROWS:
             flush()
 
@@ -288,7 +295,23 @@ def collect(conn, archived, stats):
             print(f"[gapfill] {n:,} lines, {stats['added'] + len(chunk):,} missing posts found "
                   f'({n / max(1, time.time() - started):,.0f} lines/s)', flush=True)
     check(batch)
-    flush()
+    if write:
+        flush()
+
+
+def new_stats():
+    return {'lines': 0, 'present': 0, 'added': 0, 'duplicate': 0, 'excluded': 0, 'unparsable': 0, 'failed': 0,
+            'by_year': Counter(), 'by_subreddit': Counter(), 'excluded_by_subreddit': Counter()}
+
+
+def write_report(stats, suffix, **extra):
+    report = {key: value for key, value in stats.items() if not isinstance(value, Counter)}
+    report.update(extra, by_year=dict(sorted(stats['by_year'].items())),
+                  top_subreddits=stats['by_subreddit'].most_common(50),
+                  excluded_by_subreddit=dict(stats['excluded_by_subreddit'].most_common()))
+    with open(os.path.join(os.path.dirname(PATH), FILENAME.replace('.bz2', suffix)), 'w') as f:
+        json.dump(report, f, indent=2)
+    return report
 
 
 def already_loaded():
@@ -315,9 +338,8 @@ def load():
 
         started = time.time()
         print(f'[gapfill] filling gaps from {FILENAME}', flush=True)
-        archived = archived_ids(conn, [t for t in tables if t[3:] <= LAST_MONTH])
-        stats = {'lines': 0, 'present': 0, 'added': 0, 'duplicate': 0, 'excluded': 0, 'unparsable': 0,
-                 'failed': 0, 'by_year': Counter(), 'by_subreddit': Counter()}
+        archived = archived_ids(conn, [t for t in tables if t[3:] <= LAST_MONTH] + ['rs_extra'])
+        stats = new_stats()
         collect(conn, archived, stats)
         del archived
 
@@ -353,12 +375,8 @@ def load():
                         (STATE_KEY, total, stats['unparsable'] + stats['failed']))
         conn.commit()
 
-        report = {key: value for key, value in stats.items() if not isinstance(value, Counter)}
-        report.update(merged=merged, months_without_table=unmerged, minutes=round((time.time() - started) / 60, 1),
-                      by_year=dict(sorted(stats['by_year'].items())),
-                      top_subreddits=stats['by_subreddit'].most_common(50))
-        with open(os.path.join(os.path.dirname(PATH), FILENAME.replace('.bz2', '.report.json')), 'w') as f:
-            json.dump(report, f, indent=2)
+        report = write_report(stats, '.report.json', merged=merged, months_without_table=unmerged,
+                              minutes=round((time.time() - started) / 60, 1))
         print(f"[gapfill] done: {stats['lines']:,} corpus posts, {stats['present']:,} already archived, "
               f"{stats['added']:,} recovered ({merged:,} merged into months), {stats['excluded']:,} excluded, "
               f"{stats['duplicate']:,} duplicates, {stats['unparsable'] + stats['failed']:,} skipped "
@@ -372,10 +390,41 @@ def load():
         conn.close()
 
 
+def check():
+    """Dry run: counts the posts a load would recover without writing to the database."""
+    if not os.path.exists(PATH) or not verified(PATH):
+        print(f'[gapfill] {FILENAME} not downloaded yet', flush=True)
+        return False
+    wait_for_db()
+    conn = connect()
+    try:
+        conn.set_session(readonly=True)
+        started = time.time()
+        with conn.cursor() as cur:
+            tables = [t for t in month_tables(cur) if t[3:] <= LAST_MONTH]
+            cur.execute("SELECT to_regclass('rs_extra') IS NOT NULL")
+            if cur.fetchone()[0]:
+                tables.append('rs_extra')
+        conn.commit()
+        print(f'[gapfill] checking {FILENAME} against {len(tables)} tables (dry run)', flush=True)
+        stats = new_stats()
+        collect(conn, archived_ids(conn, tables), stats, write=False)
+        report = write_report(stats, '.check.json', minutes=round((time.time() - started) / 60, 1))
+        print(f"[gapfill] check: {stats['lines']:,} corpus posts, {stats['present']:,} already archived, "
+              f"{stats['added']:,} would be recovered, {stats['excluded']:,} excluded, "
+              f"{stats['duplicate']:,} duplicates, {stats['unparsable']:,} unparsable "
+              f"in {report['minutes']} min", flush=True)
+        return True
+    finally:
+        conn.close()
+
+
 def main():
     step = sys.argv[1] if len(sys.argv) > 1 else 'all'
-    if step not in ('download', 'load', 'all'):
-        sys.exit('usage: gapfill_loader.py [download|load|all]')
+    if step not in ('download', 'load', 'all', 'check'):
+        sys.exit('usage: gapfill_loader.py [download|load|all|check]')
+    if step == 'check':
+        sys.exit(0 if check() else 1)
     if already_loaded():
         print(f'[gapfill] {FILENAME} already loaded', flush=True)
         return
