@@ -107,6 +107,7 @@ test.describe('Posts', () => {
 
   for (const [query, why] of [
     ['startDate=2005-6', 'bad month'],
+    ['startDate=2020-13', 'month 13'],
     ['subreddit=bad%20name', 'bad subreddit'],
     ['author=%5Bdeleted%5D', 'bad author'],
     ['page=10001', 'page out of range'],
@@ -214,6 +215,10 @@ test.describe('TopCommunities', () => {
     const { communities } = await get(request, '/api/TopCommunities?startDate=2010-01&endDate=2010-12');
     expect(communities).toEqual([{ name: 'AskHistory', posts: 6 }]);
   });
+
+  test('rejects months that do not exist', async ({ request }) => {
+    await get(request, '/api/TopCommunities?startDate=2020-13&endDate=2020-12', 400);
+  });
 });
 
 test.describe('User', () => {
@@ -261,6 +266,21 @@ test.describe('Sitemaps', () => {
 
   test('month sitemap lists threads', async ({ request }) => {
     const xml = await (await request.get('/Sitemap/2005_12-1')).text();
-    expect(xml).toContain('/Thread/b001');
+    for (const id of ['b001', 'b005', 'b100', 'b113']) expect(xml).toContain(`/Thread/${id}<`);
+    expect(xml.match(/<url>/g)).toHaveLength(45);
+  });
+
+  test('batches and index pages past the end are 404s', async ({ request }) => {
+    expect((await request.get('/Sitemap/2005_12-2')).status()).toBe(404);
+    expect((await request.get('/Sitemap/1999_01-1')).status()).toBe(404);
+    expect((await request.get('/sitemap.xml?page=2')).status()).toBe(404);
+    expect((await request.get('/sitemap.xml?page=x')).status()).toBe(404);
+  });
+
+  test('robots.txt lists the sitemap index', async ({ request }) => {
+    const text = await (await request.get('/robots.txt')).text();
+    expect(text).toContain('User-agent: *');
+    expect(text).toMatch(/^Sitemap: http:\/\/127\.0\.0\.1:\d+\/sitemap\.xml$/m);
+    expect(text).not.toContain('page=2');
   });
 });

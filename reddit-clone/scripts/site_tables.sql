@@ -148,7 +148,9 @@ BEGIN
       col_sql := col_sql || format('%I::text AS %I, ', col, col);
     END IF;
   END LOOP;
-  DROP TABLE IF EXISTS feed_rollup_scan;
+  IF to_regclass('pg_temp.feed_rollup_scan') IS NOT NULL THEN
+    DROP TABLE feed_rollup_scan;
+  END IF;
   EXECUTE format(
     'CREATE TEMP TABLE feed_rollup_scan AS
      SELECT CASE WHEN subreddit IN (''None'', '''') THEN NULL ELSE subreddit END AS subreddit, id,

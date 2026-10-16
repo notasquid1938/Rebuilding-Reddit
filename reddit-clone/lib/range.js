@@ -1,4 +1,4 @@
-const MONTH_RE = /^\d{4}-\d{2}$/;
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 // Repeated parameters (?from=a&from=b) arrive as arrays
 const isMonth = (value) => typeof value === 'string' && MONTH_RE.test(value);
 

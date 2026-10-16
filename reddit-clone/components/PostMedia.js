@@ -27,9 +27,29 @@ const Reveal = ({ reason, children }) => {
   );
 };
 
-const ImageMedia = ({ src, alt }) => {
+// Shown when an image can't be loaded any more, so the post still leads somewhere
+const MediaUnavailable = ({ href }) => (
+  <div className={`${styles.mediaFrame} ${styles.mediaUnavailable}`}>
+    <span>Image no longer available</span>
+    <span className={styles.mediaUnavailableLinks}>
+      <a href={href} target="_blank" rel="noopener noreferrer nofollow" onClick={stop}>
+        Original link <ExternalIcon size={12} />
+      </a>
+      <a
+        href={`https://web.archive.org/web/2/${href}`}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        onClick={stop}
+      >
+        Wayback Machine <ExternalIcon size={12} />
+      </a>
+    </span>
+  </div>
+);
+
+const ImageMedia = ({ src, alt, href }) => {
   const [failed, setFailed] = useState(false);
-  if (failed) return null;
+  if (failed) return <MediaUnavailable href={href} />;
   return (
     <div className={styles.mediaFrame}>
       <img
@@ -120,7 +140,7 @@ const PostMedia = ({ post }) => {
   if (!media || media.type === 'link') return null;
 
   let content;
-  if (media.type === 'image') content = <ImageMedia src={media.src} alt={post.title} />;
+  if (media.type === 'image') content = <ImageMedia src={media.src} alt={post.title} href={post.url} />;
   else if (media.type === 'video') {
     content = (
       <div className={styles.mediaFrame}>

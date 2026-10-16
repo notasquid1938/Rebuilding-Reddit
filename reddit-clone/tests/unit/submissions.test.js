@@ -73,6 +73,9 @@ describe('input validation', () => {
   it('accepts real names and rejects injection attempts', () => {
     expect(isMonth('2005-06')).toBe(true);
     expect(isMonth('2005-6')).toBe(false);
+    expect(isMonth('2020-13')).toBe(false);
+    expect(isMonth('2020-00')).toBe(false);
+    expect(isMonth('2020-12')).toBe(true);
     expect(isMonth(undefined)).toBe(false);
     expect(SUBREDDIT_RE.test('reddit.com')).toBe(true);
     expect(SUBREDDIT_RE.test('a"; DROP TABLE x')).toBe(false);

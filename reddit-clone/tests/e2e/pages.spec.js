@@ -50,6 +50,20 @@ test.describe('Home', () => {
     await expect(page).toHaveURL(/sort=new/);
   });
 
+  test('an image that no longer loads still links to the original', async ({ page }) => {
+    const url = 'http://127.0.0.1:9/gone.jpg';
+    await page.route('**/api/Posts?*', (route) =>
+      route.fulfill({
+        json: [{ id: 'zz1', title: 'Dead image', subreddit: 'pics', author: 'alice', url, domain: '127.0.0.1',
+                 score: 1, num_comments: 0, created_utc: 1134000000, is_self: false }],
+      })
+    );
+    await page.goto('/');
+    await expect(page.getByText('Image no longer available')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Original link' })).toHaveAttribute('href', url);
+    await expect(page.getByRole('link', { name: 'Wayback Machine' })).toHaveAttribute('href', `https://web.archive.org/web/2/${url}`);
+  });
+
   test('all time', async ({ page }) => {
     await page.goto('/?t=all');
     const titles = await feedTitles(page);

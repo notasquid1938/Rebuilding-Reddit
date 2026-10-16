@@ -48,7 +48,7 @@ function UserPage() {
             <span className={`${styles.tab} ${styles.tabActive}`} aria-current="page">
               Posts
             </span>
-            <span className={`${styles.tab} ${styles.tabDisabled}`} title="Comments haven't been archived yet">
+            <span className={`${styles.tab} ${styles.tabDisabled}`} title="Browsing a user's comments isn't supported yet">
               Comments
             </span>
           </nav>
