@@ -615,8 +615,9 @@ export async function getUserStats(author) {
 }
 
 // A random thread: from the front page, one of a month's top posts (top_posts,
-// NSFW left out); in a community, one of the top 100 posts of a month picked
-// in proportion to how much the community posted then.
+// NSFW left out); in a community, one of the posts feed_rollup kept for a
+// month picked in proportion to how much the community posted then. Both
+// tables are small, so this never waits on the monthly tables' disk.
 export async function randomPostId(subreddit) {
   if (!subreddit) {
     if (!(await hasTable('top_posts'))) return null;
@@ -629,23 +630,16 @@ export async function randomPostId(subreddit) {
     );
     return rows[0]?.id || null;
   }
-  if (!(await hasTable('subreddit_monthly'))) return null;
-  const db = await connectToDatabase();
-  const { rows: months } = await db.query(
-    `SELECT to_char(month, 'YYYY-MM') AS month, posts FROM subreddit_monthly
-      WHERE subreddit = $1 ORDER BY -ln(1 - random()) / posts LIMIT 1`,
-    [subreddit]
-  );
-  if (!months[0]) return null;
-  const table = (await getSubmissionTables()).find((t) => t.month === months[0].month);
-  if (!table) return null;
+  if (!(await hasTable('subreddit_monthly')) || !(await hasTable('feed_rollup'))) return null;
   const { rows } = await timedQuery(
-    `SELECT id FROM "${table.name}" WHERE subreddit = $1 ORDER BY score DESC NULLS LAST
-      OFFSET floor(random() * least($2::int, 100)) LIMIT 1`,
-    [subreddit, months[0].posts],
-    10000
+    `SELECT f.ids[1 + floor(random() * cardinality(f.ids))::int]::text AS id
+       FROM (SELECT month FROM subreddit_monthly WHERE subreddit = $1
+              ORDER BY -ln(1 - random()) / posts LIMIT 1) m
+       JOIN feed_rollup f ON f.subreddit = $1 AND f.month = m.month`,
+    [subreddit],
+    5000
   );
-  return rows[0]?.id || null;
+  return rows[0]?.id ? BigInt(rows[0].id).toString(36) : null;
 }
 
 export async function getSubredditHistory(subreddit) {
