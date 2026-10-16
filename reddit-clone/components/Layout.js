@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Header from './Header';
 import LeftNav from './LeftNav';
+import KeyboardShortcuts from './KeyboardShortcuts';
 import styles from '@/styles/Layout.module.css';
 
 // App shell: sticky header, left navigation, main column and optional right sidebar.
@@ -28,6 +29,7 @@ const Layout = ({ children, sidebar, banner }) => {
           </div>
         </div>
       </div>
+      <KeyboardShortcuts />
     </div>
   );
 };

@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Feed from '@/components/Feed';
 import FeedControls from '@/components/FeedControls';
 import SubredditIcon from '@/components/SubredditIcon';
+import HistoryChart from '@/components/HistoryChart';
+import { ShuffleIcon } from '@/components/Icons';
 import { CommunityCard, TopCommunitiesCard, SidebarFooter } from '@/components/Sidebar';
 import { addRecentCommunity } from '@/lib/hooks';
 import { formatCount, monthLabel } from '@/lib/format';
@@ -59,6 +62,12 @@ const CommunityBanner = ({ name, info }) => {
             </p>
           )}
         </div>
+        {info?.posts > 0 && (
+          <Link href={`/random?subreddit=${encodeURIComponent(name)}`} className={styles.headerAction}>
+            <ShuffleIcon size={16} />
+            Random post
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -89,6 +98,7 @@ function CommunityPage({ name, info }) {
       sidebar={
         <>
           <CommunityCard name={name} info={info} showSidebar />
+          {info?.posts > 0 && <HistoryChart name={name} range={range} onSelect={(month) => setRange({ from: month, to: month })} />}
           <TopCommunitiesCard from={range?.from} to={range?.to} title="Other communities" exclude={name} />
           <SidebarFooter />
         </>

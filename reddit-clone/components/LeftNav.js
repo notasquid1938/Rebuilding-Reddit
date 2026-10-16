@@ -2,7 +2,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import SubredditIcon from './SubredditIcon';
-import { HomeIcon, CalendarIcon, ChevronDownIcon, ChevronUpIcon, ArchiveIcon, CodeIcon, ExternalIcon } from './Icons';
+import {
+  HomeIcon, CalendarIcon, ChevronDownIcon, ChevronUpIcon, ArchiveIcon, CodeIcon, ExternalIcon, BookmarkIcon, ShuffleIcon,
+} from './Icons';
 import { useAvailableMonths, useRecentCommunities } from '@/lib/hooks';
 import { isSort } from '@/lib/sorts';
 import styles from '@/styles/Layout.module.css';
@@ -57,6 +59,12 @@ const LeftNav = ({ open, onClose }) => {
           </NavItem>
           <NavItem href={`/?t=all${sortParam}`} icon={<ArchiveIcon />} active={onHome && t === 'all'}>
             All time
+          </NavItem>
+          <NavItem href="/saved" icon={<BookmarkIcon filled={router.pathname === '/saved'} />} active={router.pathname === '/saved'}>
+            Saved
+          </NavItem>
+          <NavItem href="/random" icon={<ShuffleIcon />}>
+            Random post
           </NavItem>
         </ul>
         <hr className={styles.navDivider} />

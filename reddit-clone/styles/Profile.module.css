@@ -51,6 +51,26 @@
   color: var(--text-weak);
 }
 
+.headerAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 32px;
+  margin: 46px 0 0 auto;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-secondary);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.headerAction:hover {
+  background: var(--bg-secondary-hover);
+}
+
 /* ---------- User profile ---------- */
 .userHeader {
   display: flex;
@@ -98,6 +118,10 @@
 
   .headerRow {
     margin-top: -24px;
+  }
+
+  .headerAction {
+    margin-top: 28px;
   }
 
   .headerRow .headerText {

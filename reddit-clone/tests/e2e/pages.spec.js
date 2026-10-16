@@ -238,6 +238,96 @@ test.describe('User', () => {
   });
 });
 
+test.describe('Saved posts', () => {
+  test('save from the feed, list on /saved, unsave', async ({ page }) => {
+    await page.goto('/?from=2005-12&to=2005-12');
+    const first = page.locator('article').first();
+    await expect(first.getByRole('button', { name: 'Save' })).toBeVisible();
+    await first.getByRole('button', { name: 'Save' }).click();
+    await expect(first.getByRole('button', { name: 'Saved' })).toBeVisible();
+
+    await page.getByRole('link', { name: 'Saved', exact: true }).click();
+    await expect(page).toHaveURL(/\/saved$/);
+    await expect(page.getByText(FIXTURE.topPost.title)).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(FIXTURE.topPost.title)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Saved' }).click();
+    await expect(page.getByText('Nothing saved yet')).toBeVisible();
+  });
+
+  test('save from a thread', async ({ page }) => {
+    await page.goto(`/Thread/${FIXTURE.selfPost.id}`);
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.goto('/saved');
+    await expect(page.getByText(FIXTURE.selfPost.title)).toBeVisible();
+  });
+});
+
+test.describe('Keyboard shortcuts', () => {
+  test('j/k select posts, s saves, o opens, ? shows help', async ({ page }) => {
+    await page.goto('/?from=2005-12&to=2005-12');
+    await feedTitles(page);
+    const articles = page.locator('article');
+    await page.keyboard.press('j');
+    await expect(articles.nth(0)).toHaveAttribute('data-kb-selected', '');
+    await page.keyboard.press('j');
+    await expect(articles.nth(1)).toHaveAttribute('data-kb-selected', '');
+    await expect(articles.nth(0)).not.toHaveAttribute('data-kb-selected', '');
+    await page.keyboard.press('k');
+    await page.keyboard.press('j');
+    await page.keyboard.press('s');
+    await expect(articles.nth(1).getByRole('button', { name: 'Saved' })).toBeVisible();
+
+    await page.keyboard.press('?');
+    await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await page.keyboard.press('j');
+    await page.keyboard.press('o');
+    await expect(page).toHaveURL(/\/Thread\//);
+  });
+
+  test('/ focuses the search box and typing there is not a shortcut', async ({ page }) => {
+    await page.goto('/');
+    await feedTitles(page);
+    await page.keyboard.press('/');
+    const search = page.getByRole('combobox');
+    await expect(search).toBeFocused();
+    await page.keyboard.type('jk');
+    await expect(search).toHaveValue('jk');
+    await expect(page.locator('article[data-kb-selected]')).toHaveCount(0);
+  });
+});
+
+test.describe('Random post', () => {
+  test('the nav link opens a thread', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('link', { name: 'Random post' }).first().click();
+    await expect(page).toHaveURL(/\/Thread\/[0-9a-z]+$/);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  });
+
+  test('the community button stays in the community', async ({ page }) => {
+    await page.goto('/r/programming');
+    await page.locator('a[href="/random?subreddit=programming"]').click();
+    await expect(page).toHaveURL(/\/Thread\/[0-9a-z]+$/);
+    await expect(page.getByRole('link', { name: 'r/programming' }).first()).toBeVisible();
+  });
+});
+
+test.describe('Community history', () => {
+  test('chart shows posts per month and a bar opens that month', async ({ page }) => {
+    await page.goto('/r/programming');
+    const card = page.locator('section', { hasText: 'Posts per month' });
+    await expect(card.getByText('Busiest: Dec 2005 with 15 posts')).toBeVisible();
+    await card.locator('svg g').nth(1).click();
+    await expect(page).toHaveURL(/from=2006-01&to=2006-01/);
+    await expect(page.locator('article h2, article h3').first()).toHaveText('January winner');
+  });
+});
+
 test.describe('Search', () => {
   test('suggests communities and opens them', async ({ page }) => {
     await page.goto('/');

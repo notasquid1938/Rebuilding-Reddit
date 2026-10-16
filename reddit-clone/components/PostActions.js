@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
-import { UpvoteIcon, DownvoteIcon, CommentIcon, ShareIcon } from './Icons';
+import { UpvoteIcon, DownvoteIcon, CommentIcon, ShareIcon, BookmarkIcon } from './Icons';
 import { formatCount } from '@/lib/format';
+import { toggleSavedPost, useIsSaved } from '@/lib/hooks';
 import styles from '@/styles/Post.module.css';
 
 // Votes are local only: this is a read-only archive, but the control should
@@ -46,6 +47,27 @@ export const ShareButton = ({ path, size = 'md', label = 'Share' }) => {
     <button type="button" className={`${styles.pill} ${styles.pillButton} ${size === 'sm' ? styles.pillSmall : ''}`} onClick={share}>
       <ShareIcon size={size === 'sm' ? 16 : 18} />
       <span>{copied ? 'Copied!' : label}</span>
+    </button>
+  );
+};
+
+// Saved posts live in this browser (see lib/hooks.js) and are listed on /saved
+export const SaveButton = ({ post, size = 'md' }) => {
+  const saved = useIsSaved(post.id);
+  return (
+    <button
+      type="button"
+      className={`${styles.pill} ${styles.pillButton} ${size === 'sm' ? styles.pillSmall : ''}`}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSavedPost(post);
+      }}
+      aria-pressed={saved}
+      data-action="save"
+    >
+      <BookmarkIcon size={size === 'sm' ? 16 : 18} filled={saved} />
+      <span>{saved ? 'Saved' : 'Save'}</span>
     </button>
   );
 };

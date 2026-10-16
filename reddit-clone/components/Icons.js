@@ -136,3 +136,28 @@ export const CloseIcon = (props) => (
     <path d="m11.273 10 5.363-5.363a.9.9 0 1 0-1.273-1.273L10 8.727 4.637 3.364a.9.9 0 1 0-1.273 1.273L8.727 10l-5.363 5.363a.9.9 0 1 0 1.273 1.273L10 11.273l5.363 5.363a.897.897 0 0 0 1.274 0 .9.9 0 0 0 0-1.273L11.273 10Z" />
   </Svg>
 );
+
+export const BookmarkIcon = ({ filled, ...props }) => (
+  <Svg {...props}>
+    <path
+      d="M6 3.5h8a1 1 0 0 1 1 1v12.2a.4.4 0 0 1-.63.33L10 14l-4.37 3.03A.4.4 0 0 1 5 16.7V4.5a1 1 0 0 1 1-1Z"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+export const ShuffleIcon = (props) => (
+  <Svg {...props}>
+    <path
+      d="M3 6h2.5c1.6 0 3 .8 3.9 2.1l2.2 3.3c.9 1.3 2.3 2.1 3.9 2.1H17M3 14h2.5c1.6 0 3-.8 3.9-2.1M12.6 8.1c.9-1.3 2.3-2.1 3.9-2.1H17M15 4l2 2-2 2M15 12l2 2-2 2"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);

@@ -613,3 +613,47 @@ export async function getUserStats(author) {
     lastPost: row.last_post ? Number(row.last_post) : null,
   };
 }
+
+// A random thread: from the front page, one of a month's top posts (top_posts,
+// NSFW left out); in a community, one of the top 100 posts of a month picked
+// in proportion to how much the community posted then.
+export async function randomPostId(subreddit) {
+  if (!subreddit) {
+    if (!(await hasTable('top_posts'))) return null;
+    const { rows } = await timedQuery(
+      `SELECT id FROM top_posts
+        WHERE coalesce(lower(over_18), 'false') <> 'true' AND id IS NOT NULL
+        ORDER BY random() LIMIT 1`,
+      [],
+      5000
+    );
+    return rows[0]?.id || null;
+  }
+  if (!(await hasTable('subreddit_monthly'))) return null;
+  const db = await connectToDatabase();
+  const { rows: months } = await db.query(
+    `SELECT to_char(month, 'YYYY-MM') AS month, posts FROM subreddit_monthly
+      WHERE subreddit = $1 ORDER BY -ln(1 - random()) / posts LIMIT 1`,
+    [subreddit]
+  );
+  if (!months[0]) return null;
+  const table = (await getSubmissionTables()).find((t) => t.month === months[0].month);
+  if (!table) return null;
+  const { rows } = await timedQuery(
+    `SELECT id FROM "${table.name}" WHERE subreddit = $1 ORDER BY score DESC NULLS LAST
+      OFFSET floor(random() * least($2::int, 100)) LIMIT 1`,
+    [subreddit, months[0].posts],
+    10000
+  );
+  return rows[0]?.id || null;
+}
+
+export async function getSubredditHistory(subreddit) {
+  if (!(await hasTable('subreddit_monthly'))) return [];
+  const { rows } = await timedQuery(
+    `SELECT to_char(month, 'YYYY-MM') AS month, posts FROM subreddit_monthly WHERE subreddit = $1 ORDER BY month`,
+    [subreddit],
+    5000
+  );
+  return rows.map((r) => ({ month: r.month, posts: Number(r.posts) }));
+}

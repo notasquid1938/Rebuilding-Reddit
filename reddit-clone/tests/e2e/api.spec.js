@@ -221,6 +221,41 @@ test.describe('TopCommunities', () => {
   });
 });
 
+test.describe('SubredditHistory', () => {
+  test('lists posts per month', async ({ request }) => {
+    expect(await get(request, '/api/SubredditHistory?name=PROGRAMMING')).toEqual({
+      months: [
+        { month: '2005-12', posts: 15 },
+        { month: '2006-01', posts: 11 },
+        { month: '2006-02', posts: 4 },
+      ],
+    });
+    expect(await get(request, '/api/SubredditHistory?name=neverexisted')).toEqual({ months: [] });
+    await get(request, '/api/SubredditHistory?name=bad%20name', 400);
+  });
+});
+
+test.describe('Random', () => {
+  test('redirects to a thread', async ({ request }) => {
+    const response = await request.get('/random', { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers().location).toMatch(/^\/Thread\/[0-9a-z]+$/);
+  });
+
+  test('stays in a community', async ({ request }) => {
+    for (let i = 0; i < 5; i++) {
+      const location = (await request.get('/random?subreddit=programming', { maxRedirects: 0 })).headers().location;
+      const id = location.split('/').pop();
+      expect((await get(request, `/api/ID?id=${id}`)).subreddit).toBe('programming');
+    }
+  });
+
+  test('falls back to the community page when it has no posts', async ({ request }) => {
+    const response = await request.get('/random?subreddit=neverexisted', { maxRedirects: 0 });
+    expect(response.headers().location).toBe('/r/neverexisted');
+  });
+});
+
 test.describe('User', () => {
   test('totals posts and karma', async ({ request }) => {
     expect(await get(request, '/api/User?name=alice')).toMatchObject({ posts: 4, karma: 5000 + 4000 + 777 + 100 });

@@ -177,3 +177,10 @@
 .applyButton:hover {
   background: var(--button-primary-hover);
 }
+
+.pageTitle {
+  margin: 8px 0 12px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
