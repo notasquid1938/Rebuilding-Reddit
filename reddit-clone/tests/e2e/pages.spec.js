@@ -88,6 +88,14 @@ test.describe('Home', () => {
     await expect(page).toHaveURL(/from=2010-06&to=2010-06/);
     await expect(page.getByText(FIXTURE.laterPost.title)).toBeVisible();
   });
+
+  test('explore by year keeps the sort', async ({ page }) => {
+    await page.goto('/?sort=new');
+    await feedTitles(page);
+    await page.getByRole('link', { name: '2010', exact: true }).click();
+    await expect(page).toHaveURL(/from=2010-06&to=2010-06&sort=new/);
+    await expect(page.getByRole('button', { name: 'New' })).toBeVisible();
+  });
 });
 
 test.describe('Thread', () => {

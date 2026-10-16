@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import SubredditIcon from './SubredditIcon';
 import { HomeIcon, CalendarIcon, ChevronDownIcon, ChevronUpIcon, ArchiveIcon, CodeIcon, ExternalIcon } from './Icons';
 import { useAvailableMonths, useRecentCommunities } from '@/lib/hooks';
+import { isSort } from '@/lib/sorts';
 import styles from '@/styles/Layout.module.css';
 
 const Section = ({ title, children }) => {
@@ -43,6 +44,8 @@ const LeftNav = ({ open, onClose }) => {
   const years = [...new Set(months.map((m) => m.slice(0, 4)))];
   const { from, to, t } = router.query;
   const onHome = router.pathname === '/';
+  // Browsing years keeps the front page's sort
+  const sortParam = onHome && isSort(router.query.sort) && router.query.sort !== 'top' ? `&sort=${router.query.sort}` : '';
 
   return (
     <>
@@ -52,7 +55,7 @@ const LeftNav = ({ open, onClose }) => {
           <NavItem href="/" icon={<HomeIcon filled={onHome && !from && !t} />} active={onHome && !from && !t}>
             Home
           </NavItem>
-          <NavItem href="/?t=all" icon={<ArchiveIcon />} active={onHome && t === 'all'}>
+          <NavItem href={`/?t=all${sortParam}`} icon={<ArchiveIcon />} active={onHome && t === 'all'}>
             All time
           </NavItem>
         </ul>
@@ -84,7 +87,7 @@ const LeftNav = ({ open, onClose }) => {
             return (
               <NavItem
                 key={year}
-                href={`/?from=${start}&to=${end}`}
+                href={`/?from=${start}&to=${end}${sortParam}`}
                 icon={<CalendarIcon />}
                 active={onHome && from === start && to === end}
               >
