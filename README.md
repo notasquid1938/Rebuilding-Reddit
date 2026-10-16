@@ -61,10 +61,10 @@ Everything is resumable. Stopping the containers, rebooting or killing a load mi
 | Data (2005-06 → 2026-08) | Rows | Database size, site columns | Database size, all fields |
 | --- | --- | --- | --- |
 | Submissions | ~3.6 billion | ~2.5–3 TB | ~7 TB |
-| Comments | ~28 billion | ~9 TB | ~15 TB |
+| Comments | ~28 billion | ~3.3× the `.zst` size, ~10 TB | ~15 TB |
 | Compressed dumps (downloads) | | ~1.2 TB posts, ~3 TB comments | |
 
-By default only submissions are loaded, with the columns the website uses. Comments are switched on with `LOAD_COMMENTS=1` once there's room (see below).
+Submissions and comments are loaded with the columns the website uses. Comments load oldest month first until the disk would drop below `LOADER_MIN_FREE_GB`; the months that don't fit wait on disk and load on a later run once there is room.
 
 ### Running it
 
@@ -95,9 +95,11 @@ Set these on the `loader` service in `docker-compose.yml`:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `LOAD_COMMENTS` | `0` | `1` downloads and loads comments as well as submissions |
+| `LOAD_COMMENTS` | `1` | `0` loads submissions only |
+| `FETCH_COMMENTS` | `0` | `1` also downloads comment months that aren't on disk (`0` loads only the ones already there) |
+| `LOADER_MIN_FREE_GB` | `100` | A month only loads if the disk keeps this much free throughout; the rest wait for a later run (unset or `0` disables the check) |
 | `LOADER_COLUMNS` | `site` | `site` keeps only the fields the website shows (about ⅓ the size); `all` keeps every field in the dumps |
-| `DELETE_LOADED_DUMPS` | `comments` | Kinds whose `.zst` is deleted after a load with zero skipped rows, to save space |
+| `DELETE_LOADED_DUMPS` | `submissions,comments` | Kinds whose `.zst` is deleted after a load with zero skipped rows, to save space |
 | `LOADER_WORKERS` | `4` | Months loaded in parallel |
 | `LOADER_TABLESPACE` | `archive_hdd` | Tablespace for loaded months (created on the `pg_archive` volume) |
 | `GAPFILL` | `1` | `0` skips the 2006–2015 gap-fill corpus |

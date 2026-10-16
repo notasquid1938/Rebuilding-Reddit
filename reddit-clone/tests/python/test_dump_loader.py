@@ -88,3 +88,49 @@ def test_site_columns_cover_what_the_website_reads():
     for column in ('title', 'selftext', 'url', 'score', 'created_utc', 'num_comments', 'over_18', 'link_flair_text'):
         assert f"'{column}'" in source
         assert column in KINDS['submissions']['site_columns']
+
+
+class TestDiskBudget:
+    """LOADER_MIN_FREE_GB: a month only loads if the disk keeps the reserve free."""
+
+    def prepare(self, monkeypatch, tmp_path, free, reserved=0.0, min_free=100e9):
+        import multiprocessing
+        dump = tmp_path / 'RC_2010-01.zst'
+        dump.write_bytes(b'x' * 1000)
+        monkeypatch.setattr(dump_loader, 'MIN_FREE', min_free)
+        monkeypatch.setattr(dump_loader.shutil, 'disk_usage', lambda _: type('U', (), {'free': free})())
+        monkeypatch.setattr(dump_loader, 'SPACE_POLL_SECONDS', 0)
+        dump_loader.init_worker(multiprocessing.Value('d', reserved, lock=False), multiprocessing.Lock())
+        return str(dump)
+
+    def test_disabled_without_a_reserve(self, monkeypatch, tmp_path):
+        path = self.prepare(monkeypatch, tmp_path, free=0, min_free=0)
+        assert dump_loader.claim_space('comments', path) == 0
+
+    def test_reserves_the_peak_when_it_fits(self, monkeypatch, tmp_path):
+        path = self.prepare(monkeypatch, tmp_path, free=100e9 + 5000)
+        need = KINDS['comments']['peak_space'] * 1000
+        assert dump_loader.claim_space('comments', path) == need
+        assert dump_loader._reserved.value == need
+        dump_loader.release_space(need)
+        assert dump_loader._reserved.value == 0
+
+    def test_skipped_when_it_cannot_fit_with_nothing_else_loading(self, monkeypatch, tmp_path):
+        path = self.prepare(monkeypatch, tmp_path, free=100e9 + 4999)
+        assert dump_loader.claim_space('comments', path) is None
+
+    def test_waits_for_other_loads_to_finish(self, monkeypatch, tmp_path):
+        path = self.prepare(monkeypatch, tmp_path, free=100e9 + 5000, reserved=1.0)
+        sleeps = []
+
+        def finish_other_load(_):
+            sleeps.append(1)
+            dump_loader._reserved.value = 0.0
+        monkeypatch.setattr(dump_loader.time, 'sleep', finish_other_load)
+        assert dump_loader.claim_space('comments', path) == 5000
+        assert sleeps == [1]
+
+    def test_no_space_is_not_a_failure(self, monkeypatch, tmp_path):
+        self.prepare(monkeypatch, tmp_path, free=0)
+        monkeypatch.setattr(dump_loader, 'DATA_DIR', str(tmp_path))
+        assert dump_loader.load_file(('comments', 'RC_2010-01.zst')) == ('RC_2010-01.zst', None, 'no space')

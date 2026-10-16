@@ -29,11 +29,12 @@ if [ -n "${LOADER_TABLESPACE:-}" ]; then
   fi
 fi
 
-KINDS="submissions"
 FETCH_KINDS="submissions"
 if [ "${LOAD_COMMENTS:-0}" = "1" ]; then
-  KINDS="submissions comments"
-  FETCH_KINDS="submissions,comments"
+  # FETCH_COMMENTS=0 loads only the comment dumps already on disk
+  if [ "${FETCH_COMMENTS:-1}" = "1" ]; then
+    FETCH_KINDS="submissions,comments"
+  fi
 fi
 export FETCH_KINDS
 
@@ -74,9 +75,9 @@ run_cycle() {
   fi
 
   # Load what's on disk while the rest downloads, then load the new arrivals
-  for kind in $KINDS; do python3 -u /app/dump_loader.py "$kind"; done
+  python3 -u /app/dump_loader.py submissions
   wait "$fetch_pid"
-  for kind in $KINDS; do python3 -u /app/dump_loader.py "$kind"; done
+  python3 -u /app/dump_loader.py submissions
 
   # After the monthly dumps, so it only adds what they don't have
   if [ -n "$gapfill_pid" ] && wait "$gapfill_pid"; then
@@ -85,6 +86,11 @@ run_cycle() {
 
   echo "--- Refreshing site lookup tables ---"
   "${PSQL[@]}" -f /app/scripts/site_tables.sql -f /app/scripts/build_subreddit_metadata.sql
+
+  # Comments last: they take days, and nothing above depends on them
+  if [ "${LOAD_COMMENTS:-0}" = "1" ]; then
+    python3 -u /app/dump_loader.py comments
+  fi
 
   # Second icon pass covers communities that first appeared in the new months
   wait "$icons_pid"
