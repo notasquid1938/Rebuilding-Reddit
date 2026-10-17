@@ -105,7 +105,6 @@ Set these on the `loader` service in `docker-compose.yml`:
 | `LOADER_COMMENTS_WORKERS` | `2` | Comment months loaded in parallel (each saturates a hard disk more than a post month; overrides `LOADER_WORKERS`) |
 | `LOADER_TABLESPACE` | `archive_hdd` | Tablespace for loaded months (created on the `pg_archive` volume) |
 | `GAPFILL` | `1` | `0` skips the 2006–2015 gap-fill corpus |
-| `GAPFILL_EXCLUDE` | `jailbait,preteen_girls,creepshots,thefappening,beatingwomen` | Communities the gap-fill never adds (comma list, replaces the default) |
 | `REFRESH_HOURS` | `24` | How often to check for newly published months |
 | `ICON_RATE` | `20` | Icon downloads per second |
 

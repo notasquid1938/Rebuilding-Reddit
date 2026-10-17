@@ -14,7 +14,6 @@ the monthly dumps loaded is changed.
   reload can't drop them.
 - Ids are checked against every pre-2016 month (and rs_extra), not only the
   post's own month, so a post filed under another month isn't duplicated.
-- Communities in GAPFILL_EXCLUDE are never added.
 - Completion is recorded in loader_state; reruns are a no-op. An interrupted
   run resumes: rows already in rs_extra count as archived and merging is
   idempotent.
@@ -23,7 +22,7 @@ the monthly dumps loaded is changed.
 
 Usage: python3 gapfill_loader.py [download|load|all|check]   (default all)
 Environment: DATA_DIR, GAPFILL_URL, GAPFILL_SHA256 (empty = skip the check),
-GAPFILL_EXCLUDE (comma list, replaces the default), plus the POSTGRES_* variables.
+plus the POSTGRES_* variables.
 """
 import bz2
 import hashlib
@@ -53,8 +52,6 @@ URL = os.getenv('GAPFILL_URL', 'https://archive.org/download/FullRedditSubmissio
                 + FILENAME)
 SHA256 = os.getenv('GAPFILL_SHA256', '91a3547555288ab53649d2115a3850b956bcc99bf3ab2fefeda18c590cc8b276')
 # Banned for sexualising minors or sharing non-consensual images
-DEFAULT_EXCLUDE = 'jailbait,preteen_girls,creepshots,thefappening,beatingwomen'
-EXCLUDE = {s.strip().lower() for s in os.getenv('GAPFILL_EXCLUDE', DEFAULT_EXCLUDE).split(',') if s.strip()}
 # The corpus ends in August 2015; check against a little more than that
 LAST_MONTH = '2015_12'
 COLUMNS = KINDS['submissions']['site_columns']
@@ -83,10 +80,6 @@ def month_of(created_utc):
     except (TypeError, ValueError, OverflowError, OSError):
         return None
     return moment.strftime('%Y_%m')
-
-
-def is_excluded(record):
-    return str(record.get('subreddit') or '').lower() in EXCLUDE
 
 
 def to_int(post_id):
@@ -248,10 +241,6 @@ def collect(conn, archived, stats, write=True):
         if month is None:
             stats['unparsable'] += 1
             return
-        if is_excluded(record):
-            stats['excluded'] += 1
-            stats['excluded_by_subreddit'][str(record.get('subreddit')).lower()] += 1
-            return
         added_ids.add(value)
         stats['by_year'][month[:4]] += 1
         stats['by_subreddit'][str(record.get('subreddit'))] += 1
@@ -300,15 +289,14 @@ def collect(conn, archived, stats, write=True):
 
 
 def new_stats():
-    return {'lines': 0, 'present': 0, 'added': 0, 'duplicate': 0, 'excluded': 0, 'unparsable': 0, 'failed': 0,
-            'by_year': Counter(), 'by_subreddit': Counter(), 'excluded_by_subreddit': Counter()}
+    return {'lines': 0, 'present': 0, 'added': 0, 'duplicate': 0, 'unparsable': 0, 'failed': 0,
+            'by_year': Counter(), 'by_subreddit': Counter()}
 
 
 def write_report(stats, suffix, **extra):
     report = {key: value for key, value in stats.items() if not isinstance(value, Counter)}
     report.update(extra, by_year=dict(sorted(stats['by_year'].items())),
-                  top_subreddits=stats['by_subreddit'].most_common(50),
-                  excluded_by_subreddit=dict(stats['excluded_by_subreddit'].most_common()))
+                  top_subreddits=stats['by_subreddit'].most_common(50))
     with open(os.path.join(os.path.dirname(PATH), FILENAME.replace('.bz2', suffix)), 'w') as f:
         json.dump(report, f, indent=2)
     return report
@@ -378,7 +366,7 @@ def load():
         report = write_report(stats, '.report.json', merged=merged, months_without_table=unmerged,
                               minutes=round((time.time() - started) / 60, 1))
         print(f"[gapfill] done: {stats['lines']:,} corpus posts, {stats['present']:,} already archived, "
-              f"{stats['added']:,} recovered ({merged:,} merged into months), {stats['excluded']:,} excluded, "
+              f"{stats['added']:,} recovered ({merged:,} merged into months), "
               f"{stats['duplicate']:,} duplicates, {stats['unparsable'] + stats['failed']:,} skipped "
               f"in {report['minutes']} min", flush=True)
         return True
@@ -411,7 +399,7 @@ def check():
         collect(conn, archived_ids(conn, tables), stats, write=False)
         report = write_report(stats, '.check.json', minutes=round((time.time() - started) / 60, 1))
         print(f"[gapfill] check: {stats['lines']:,} corpus posts, {stats['present']:,} already archived, "
-              f"{stats['added']:,} would be recovered, {stats['excluded']:,} excluded, "
+              f"{stats['added']:,} would be recovered, "
               f"{stats['duplicate']:,} duplicates, {stats['unparsable']:,} unparsable "
               f"in {report['minutes']} min", flush=True)
         return True

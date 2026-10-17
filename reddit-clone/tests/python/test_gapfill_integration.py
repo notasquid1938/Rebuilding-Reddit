@@ -47,14 +47,13 @@ def first_run(dry_run):
 
 def test_check_counts_without_writing(dry_run):
     output, untouched = dry_run
-    assert '5 would be recovered, 1 excluded' in output
+    assert '6 would be recovered, 1 duplicates' in output
     assert untouched == (True, 45)  # no rs_extra table, no merged posts
     with open(os.path.join(os.environ['DATA_DIR'], 'supplements', 'RS_full_corpus.check.json')) as f:
         report = json.load(f)
-    assert {k: report[k] for k in ('lines', 'present', 'added', 'duplicate', 'excluded', 'unparsable')} == {
-        'lines': 11, 'present': 2, 'added': 5, 'duplicate': 1, 'excluded': 1, 'unparsable': 2}
-    assert report['by_year'] == {'2005': 2, '2006': 2, '2007': 1}
-    assert report['excluded_by_subreddit'] == {'jailbait': 1}
+    assert {k: report[k] for k in ('lines', 'present', 'added', 'duplicate', 'unparsable')} == {
+        'lines': 11, 'present': 2, 'added': 6, 'duplicate': 1, 'unparsable': 2}
+    assert report['by_year'] == {'2005': 2, '2006': 3, '2007': 1}
 
 
 @pytest.fixture(scope='module')
@@ -73,11 +72,11 @@ def one(cur, query, params=None):
 def test_report(first_run):
     with open(os.path.join(os.environ['DATA_DIR'], 'supplements', 'RS_full_corpus.report.json')) as f:
         report = json.load(f)
-    assert {k: report[k] for k in ('lines', 'present', 'added', 'duplicate', 'excluded', 'unparsable', 'merged')} == {
-        'lines': 11, 'present': 2, 'added': 5, 'duplicate': 1, 'excluded': 1, 'unparsable': 2, 'merged': 4}
+    assert {k: report[k] for k in ('lines', 'present', 'added', 'duplicate', 'unparsable', 'merged')} == {
+        'lines': 11, 'present': 2, 'added': 6, 'duplicate': 1, 'unparsable': 2, 'merged': 5}
     assert report['months_without_table'] == ['2007_03']
-    assert report['by_year'] == {'2005': 2, '2006': 2, '2007': 1}
-    assert '5 recovered (4 merged into months)' in first_run
+    assert report['by_year'] == {'2005': 2, '2006': 3, '2007': 1}
+    assert '6 recovered (5 merged into months)' in first_run
 
 
 def test_recovered_posts_join_their_months(db):
@@ -92,13 +91,13 @@ def test_recovered_posts_join_their_months(db):
 def test_archived_posts_are_untouched(db):
     assert one(db, "SELECT count(*) FROM rs_2005_12 WHERE id = 'b001'")[0] == 1
     assert one(db, 'SELECT count(*) FROM rs_2005_12')[0] == 45 + 2
-    assert one(db, 'SELECT count(*) FROM rs_2006_01')[0] == 32 + 1
+    assert one(db, 'SELECT count(*) FROM rs_2006_01')[0] == 32 + 2
     assert one(db, "SELECT count(*) FROM rs_extra WHERE id IN ('b001', 'c001')")[0] == 0
 
 
-def test_excluded_community_not_added(db):
-    assert one(db, "SELECT count(*) FROM rs_extra WHERE id = 'jb01'")[0] == 0
-    assert one(db, "SELECT count(*) FROM subreddit_monthly WHERE subreddit = 'jailbait'")[0] == 0
+def test_no_community_is_left_out(db):
+    assert one(db, "SELECT subreddit FROM rs_2006_01 WHERE id = 'jb01'")[0] == 'BannedForContent'
+    assert one(db, "SELECT posts FROM subreddit_monthly WHERE subreddit = 'BannedForContent'")[0] == 1
 
 
 def test_month_without_a_table_waits_in_rs_extra(db):
@@ -115,7 +114,7 @@ def test_lookup_tables_refreshed(db):
 
 def test_completion_recorded_and_rerun_is_a_no_op(db):
     assert one(db, 'SELECT table_name, rows_loaded, rows_failed FROM loader_state WHERE file = %s', (STATE_KEY,)) == (
-        'rs_extra', 5, 2)
+        'rs_extra', 6, 2)
     assert 'already loaded' in run('gapfill_loader.py')
     assert one(db, 'SELECT count(*) FROM rs_2005_12')[0] == 47
 
@@ -123,6 +122,6 @@ def test_completion_recorded_and_rerun_is_a_no_op(db):
 def test_reloading_a_month_keeps_recovered_posts(db):
     db.execute("DELETE FROM loader_state WHERE file = 'RS_2006-01.zst'")
     output = run('dump_loader.py', 'submissions')
-    assert '[rs_2006_01] +1 recovered posts from rs_extra' in output
+    assert '[rs_2006_01] +2 recovered posts from rs_extra' in output
     assert one(db, "SELECT count(*) FROM rs_2006_01 WHERE id = 'c0aa'")[0] == 1
     assert one(db, "SELECT posts FROM subreddit_monthly WHERE subreddit = 'BannedIn2015' AND month = '2006-01-01'")[0] == 1

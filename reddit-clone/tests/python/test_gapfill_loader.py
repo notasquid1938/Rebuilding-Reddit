@@ -33,13 +33,6 @@ def test_month_of(created, expected):
     assert g.month_of(created) == expected
 
 
-def test_excluded_communities_match_case_insensitively():
-    assert g.is_excluded({'subreddit': 'Jailbait'})
-    assert g.is_excluded({'subreddit': 'creepshots'})
-    assert not g.is_excluded({'subreddit': 'fatpeoplehate'})
-    assert not g.is_excluded({})
-
-
 def test_id_set_membership():
     ids = g.IdSet([5, 1, 9, 5, 2 ** 40])
     assert len(ids) == 4
