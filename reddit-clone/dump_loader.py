@@ -16,17 +16,22 @@ RC_YYYY-MM.zst comments) into monthly Postgres tables rs_YYYY_MM / rc_YYYY_MM.
   are merged back into a submissions month whenever it is (re)loaded.
 
 Usage: python3 dump_loader.py submissions|comments
-Environment: DATA_DIR (default: current directory), LOADER_WORKERS (default 4),
+Environment: DATA_DIR (default: current directory), LOADER_WORKERS (default 4;
+LOADER_SUBMISSIONS_WORKERS / LOADER_COMMENTS_WORKERS override it per kind),
 LOADER_COLUMNS (site = only what the website reads, default; all = every field),
 LOADER_TABLESPACE (optional Postgres tablespace for new tables),
 DELETE_LOADED_DUMPS (comma list of kinds whose .zst is deleted after a clean
-load, e.g. "comments"), plus the POSTGRES_* connection variables.
+load, e.g. "comments"), LOADER_MIN_FREE_GB (optional: a month is only loaded
+if the disk at LOADER_SPACE_PATH, default DATA_DIR, keeps this much free
+through the load; months that don't fit wait for a later run), plus the
+POSTGRES_* connection variables.
 """
 import io
 import json
 import multiprocessing
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -40,10 +45,13 @@ COLUMN_MODE = os.getenv('LOADER_COLUMNS', 'site')
 TABLESPACE = os.getenv('LOADER_TABLESPACE', '').strip()
 SITE_TABLES_SQL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts', 'site_tables.sql')
 DELETE_KINDS = {k.strip() for k in os.getenv('DELETE_LOADED_DUMPS', '').split(',') if k.strip()}
+MIN_FREE = float(os.getenv('LOADER_MIN_FREE_GB', '0')) * 1e9
+SPACE_PATH = os.getenv('LOADER_SPACE_PATH', DATA_DIR)
+SPACE_POLL_SECONDS = 60
 SAMPLE_LINES = 50000
 CHUNK_ROWS = 100000
 
-NUMERIC_COLUMNS = {'score', 'created_utc', 'ups', 'downs'}
+NUMERIC_COLUMNS = {'score', 'created_utc', 'ups', 'downs', 'controversiality'}
 
 KINDS = {
     'submissions': {
@@ -54,6 +62,9 @@ KINDS = {
                          'score', 'created_utc', 'num_comments', 'is_self', 'over_18', 'spoiler', 'stickied',
                          'locked', 'link_flair_text', 'thumbnail', 'distinguished', 'edited', 'permalink',
                          'author_flair_text'],
+        # Peak disk use while loading, per byte of .zst: SET LOGGED briefly
+        # holds two copies of the table (measured ~2.9-3.5x for the final size)
+        'peak_space': 5.0,
         'indexes': [
             ('sub_score_idx', '(subreddit, score DESC)'),
             ('id_idx', '(id)'),
@@ -65,7 +76,9 @@ KINDS = {
         'prefix': 'RC',
         'table_prefix': 'rc',
         'site_columns': ['id', 'parent_id', 'link_id', 'author', 'body', 'subreddit', 'subreddit_id', 'score',
-                         'created_utc', 'distinguished', 'edited', 'stickied', 'author_flair_text'],
+                         'created_utc', 'distinguished', 'edited', 'stickied', 'author_flair_text',
+                         'controversiality'],
+        'peak_space': 5.0,
         'indexes': [
             ('parent_id_index', '(parent_id)'),
             ('link_id_index', '(link_id)'),
@@ -129,7 +142,12 @@ def merge_extra(cur, table):
     cur.execute("SELECT to_regclass('rs_extra') IS NOT NULL")
     if not cur.fetchone()[0]:
         return 0
-    cols = sql.SQL(', ').join(map(sql.Identifier, KINDS['submissions']['site_columns']))
+    # Months loaded by older versions only have the columns their dump's first
+    # line had (rs_2011_01 has no "spoiler"); recovered posts fill those
+    cur.execute('SELECT attname FROM pg_attribute WHERE attrelid = %s::regclass AND attnum > 0 AND NOT attisdropped',
+                (table,))
+    present = {row[0] for row in cur.fetchall()}
+    cols = sql.SQL(', ').join(sql.Identifier(c) for c in KINDS['submissions']['site_columns'] if c in present)
     cur.execute(sql.SQL(
         'INSERT INTO {table} ({cols}) SELECT {cols} FROM rs_extra e '
         "WHERE e.month = to_date(%s, 'YYYY_MM') AND NOT EXISTS (SELECT 1 FROM {table} t WHERE t.id = e.id)").format(
@@ -223,8 +241,57 @@ def copy_chunk(conn, table, columns, rows):
         return copy_chunk(conn, table, columns, rows[:mid]) + copy_chunk(conn, table, columns, rows[mid:])
 
 
+# ---------- disk budget (LOADER_MIN_FREE_GB) ----------
+
+_reserved = None  # bytes claimed by loads in progress, shared by the pool's workers
+_space_lock = None
+
+
+def init_worker(reserved, lock):
+    global _reserved, _space_lock
+    _reserved, _space_lock = reserved, lock
+
+
+def claim_space(kind, path):
+    """Reserves the month's peak disk use. Returns the bytes reserved, or None if
+    it can't fit even once every other load in progress has finished."""
+    if not MIN_FREE or _reserved is None:
+        return 0
+    need = KINDS[kind]['peak_space'] * os.path.getsize(path)
+    while True:
+        with _space_lock:
+            free = shutil.disk_usage(SPACE_PATH).free
+            # Free space already reflects part of what other loads reserved, so
+            # this errs on the side of waiting; it's exact once they're done
+            if free - _reserved.value - need >= MIN_FREE:
+                _reserved.value += need
+                return need
+            if _reserved.value == 0:
+                return None
+        time.sleep(SPACE_POLL_SECONDS)
+
+
+def release_space(amount):
+    if amount:
+        with _space_lock:
+            _reserved.value -= amount
+
+
 def load_file(job):
     kind, filename = job
+    path = os.path.join(DATA_DIR, filename)
+    reserved = claim_space(kind, path)
+    if reserved is None:
+        print(f'[{filename}] not enough disk space to keep {MIN_FREE / 1e9:.0f} GB free; left for a later run',
+              flush=True)
+        return filename, None, 'no space'
+    try:
+        return _load_file(kind, filename)
+    finally:
+        release_space(reserved)
+
+
+def _load_file(kind, filename):
     spec = KINDS[kind]
     match = FILE_RE.match(filename)
     table = f"{spec['table_prefix']}_{match.group(2)}_{match.group(3)}"
@@ -353,14 +420,19 @@ def main():
     ensure_state_table()
     done = completed_files()
     prefix = KINDS[kind]['prefix']
+    workers = max(1, int(os.getenv(f'LOADER_{kind.upper()}_WORKERS', WORKERS)))
     pending = sorted(f for f in os.listdir(DATA_DIR)
                      if FILE_RE.match(f) and f.startswith(prefix) and f not in done)
-    print(f'{kind}: {len(pending)} file(s) to load with {WORKERS} worker(s), columns={COLUMN_MODE}', flush=True)
+    print(f'{kind}: {len(pending)} file(s) to load with {workers} worker(s), columns={COLUMN_MODE}', flush=True)
     if not pending:
         return
-    with multiprocessing.Pool(WORKERS) as pool:
+    reserved, lock = multiprocessing.Value('d', 0.0, lock=False), multiprocessing.Lock()
+    with multiprocessing.Pool(workers, initializer=init_worker, initargs=(reserved, lock)) as pool:
         results = pool.map(load_file, [(kind, f) for f in pending], chunksize=1)
-    failures = [table for table, loaded, _ in results if loaded is None]
+    no_space = [table for table, loaded, why in results if loaded is None and why == 'no space']
+    failures = [table for table, loaded, why in results if loaded is None and why != 'no space']
+    if no_space:
+        print(f'{kind}: {len(no_space)} file(s) wait for disk space: {no_space[0]} .. {no_space[-1]}', flush=True)
     if failures:
         print(f'{kind}: {len(failures)} file(s) failed and will be retried next run: {", ".join(failures)}', flush=True)
         sys.exit(1)

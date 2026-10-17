@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDownIcon, CalendarIcon } from './Icons';
 import { useAvailableMonths } from '@/lib/hooks';
 import { monthLabel, MONTHS } from '@/lib/format';
+import { SORT_LABELS } from '@/lib/sorts';
 import styles from '@/styles/Feed.module.css';
 
 function useDismiss(open, setOpen) {
@@ -93,7 +94,7 @@ const FeedControls = ({ sort, sorts = ['top'], onSortChange, range, onRangeChang
           aria-expanded={sortOpen}
           disabled={sorts.length < 2}
         >
-          <span>{sort === 'new' ? 'New' : 'Top'}</span>
+          <span>{SORT_LABELS[sort]}</span>
           {sorts.length > 1 && <ChevronDownIcon size={16} />}
         </button>
         {sortOpen && (
@@ -111,7 +112,7 @@ const FeedControls = ({ sort, sorts = ['top'], onSortChange, range, onRangeChang
                     setSortOpen(false);
                   }}
                 >
-                  {s === 'new' ? 'New' : 'Top'}
+                  {SORT_LABELS[s]}
                 </button>
               </li>
             ))}

@@ -87,12 +87,22 @@ services:
       # New months go to the archive tablespace (see the db volumes)
       - LOADER_TABLESPACE=archive_hdd
       - TABLESPACE_LOCATION=/var/lib/postgresql/tablespaces/archive/data
-      # Comments need ~9 TB more than posts; set to 1 once there is room
-      - LOAD_COMMENTS=0
-      # Delete RC_*.zst after a load with zero skipped rows
-      - DELETE_LOADED_DUMPS=comments
+      # Comments take ~3.3x their .zst size in Postgres (~10 TB for every
+      # month), so they load oldest first until the disk would drop below
+      # LOADER_MIN_FREE_GB; the rest wait until there is room
+      - LOAD_COMMENTS=1
+      - LOADER_MIN_FREE_GB=100
+      # Comment months saturate the archive disk; with more at once, community
+      # pages (random reads on the same disk) time out while they load
+      - LOADER_COMMENTS_WORKERS=2
+      # Don't download comment months: the ones on disk already fill the space
+      - FETCH_COMMENTS=0
+      # Delete RS/RC_*.zst after a load with zero skipped rows
+      - DELETE_LOADED_DUMPS=submissions,comments
       # Fill 2006-2015 gaps once from the Internet Archive's 2015 corpus (42.7 GB download)
       - GAPFILL=1
+      # Also add posts from the 2013 scrape and community archives (supplements_loader.py)
+      - SUPPLEMENTS=1
       # Check for newly published months daily
       - REFRESH_HOURS=24
       - ICON_RATE=20

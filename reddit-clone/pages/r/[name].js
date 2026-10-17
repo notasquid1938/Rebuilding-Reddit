@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Feed from '@/components/Feed';
 import FeedControls from '@/components/FeedControls';
 import SubredditIcon from '@/components/SubredditIcon';
+import HistoryChart from '@/components/HistoryChart';
+import { ShuffleIcon } from '@/components/Icons';
 import { CommunityCard, TopCommunitiesCard, SidebarFooter } from '@/components/Sidebar';
 import { addRecentCommunity } from '@/lib/hooks';
 import { formatCount, monthLabel } from '@/lib/format';
 import { rangeFromQuery, rangeToQuery } from '@/lib/range';
 import { SITE_NAME } from '@/lib/site';
+import { FEED_SORTS, sortFromQuery, withSort } from '@/lib/sorts';
 import styles from '@/styles/Profile.module.css';
 
 export async function getServerSideProps({ params, res }) {
@@ -58,6 +62,12 @@ const CommunityBanner = ({ name, info }) => {
             </p>
           )}
         </div>
+        {info?.posts > 0 && (
+          <Link href={`/random?subreddit=${encodeURIComponent(name)}`} className={styles.headerAction}>
+            <ShuffleIcon size={16} />
+            Random post
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -66,15 +76,20 @@ const CommunityBanner = ({ name, info }) => {
 function CommunityPage({ name, info }) {
   const router = useRouter();
   const range = rangeFromQuery(router.query, null);
-  const feedQuery = { subreddit: name, startDate: range?.from, endDate: range?.to, sort: 'top' };
+  const sort = sortFromQuery(router.query, 'top');
+  const feedQuery = { subreddit: name, startDate: range?.from, endDate: range?.to, sort };
 
   useEffect(() => {
     if (info?.posts) addRecentCommunity(name);
   }, [name, info]);
 
   const setRange = (next) => {
-    const query = { name, ...(next ? rangeToQuery(next) : {}) };
+    const query = withSort({ name, ...(next ? rangeToQuery(next) : {}) }, sort, 'top');
     router.push({ pathname: '/r/[name]', query }, undefined, { shallow: true });
+  };
+
+  const setSort = (next) => {
+    router.push({ pathname: '/r/[name]', query: withSort(router.query, next, 'top') }, undefined, { shallow: true });
   };
 
   return (
@@ -83,6 +98,7 @@ function CommunityPage({ name, info }) {
       sidebar={
         <>
           <CommunityCard name={name} info={info} showSidebar />
+          {info?.posts > 0 && <HistoryChart name={name} range={range} onSelect={(month) => setRange({ from: month, to: month })} />}
           <TopCommunitiesCard from={range?.from} to={range?.to} title="Other communities" exclude={name} />
           <SidebarFooter />
         </>
@@ -97,7 +113,7 @@ function CommunityPage({ name, info }) {
         <meta property="og:title" content={`r/${name}`} />
       </Head>
 
-      <FeedControls sort="top" range={range} onRangeChange={setRange} />
+      <FeedControls sort={sort} sorts={FEED_SORTS} onSortChange={setSort} range={range} onRangeChange={setRange} />
       <hr />
       <Feed
         key={JSON.stringify(feedQuery)}

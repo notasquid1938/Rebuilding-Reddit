@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import SubredditIcon from './SubredditIcon';
 import Markdown from './Markdown';
 import PostMedia, { LinkThumbnail, LinkDomain } from './PostMedia';
-import { VoteButtons, CommentsButton, ShareButton } from './PostActions';
+import { VoteButtons, CommentsButton, ShareButton, SaveButton } from './PostActions';
 import { decodeEntities, timeAgo, fullDate, postPath } from '@/lib/format';
 import styles from '@/styles/Post.module.css';
 
@@ -88,6 +88,7 @@ const PostCard = ({ post, context = 'feed' }) => {
         <VoteButtons score={post.score} />
         <CommentsButton count={post.num_comments} href={href} />
         <ShareButton path={href} />
+        <SaveButton post={post} />
       </div>
     </article>
   );

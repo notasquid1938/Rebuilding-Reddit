@@ -70,10 +70,22 @@ const POST_DETAIL_COLUMNS = [
 
 const COMMENT_COLUMNS = [
   'id', 'parent_id', 'link_id', 'author', 'body', 'distinguished', 'edited', 'stickied',
-  'author_flair_text', numeric('score'), numeric('created_utc'),
+  'author_flair_text', numeric('score'), numeric('created_utc'), numeric('controversiality'),
 ];
 
-const MONTH_RE = /^\d{4}-\d{2}$/;
+// Comment sorts: SQL for the paged top level, and the same order for replies.
+// Controversial puts the comments Reddit flagged (controversiality = 1) first.
+const COMMENT_ORDER = {
+  top: { sql: 'score DESC NULLS LAST', compare: (a, b) => b.score - a.score },
+  new: { sql: 'created_utc DESC NULLS LAST', compare: (a, b) => b.created_utc - a.created_utc },
+  old: { sql: 'created_utc ASC NULLS LAST', compare: (a, b) => a.created_utc - b.created_utc },
+  controversial: {
+    sql: 'controversiality DESC NULLS LAST, score DESC NULLS LAST',
+    compare: (a, b) => b.controversial - a.controversial || b.score - a.score,
+  },
+};
+
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 export const isMonth = (value) => typeof value === 'string' && MONTH_RE.test(value);
 export const SUBREDDIT_RE = /^[A-Za-z0-9_.]{1,64}$/;
 export const AUTHOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -128,6 +140,7 @@ export function normalizeComment(row) {
     distinguished: nullish(row.distinguished) ? null : row.distinguished,
     stickied: toBool(row.stickied),
     flair: nullish(row.author_flair_text) ? null : row.author_flair_text,
+    controversial: toNum(row.controversiality) === 1,
   };
 }
 
@@ -200,6 +213,96 @@ async function queryTopPosts(tables, limit, offset) {
   return rows.map(normalizePost);
 }
 
+// Sorts other than Top (and New for one author) have no index in the monthly
+// tables. Community and front-page feeds read them from feed_rollup (see
+// scripts/site_tables.sql), which keeps each month's leading posts for each
+// sort; author feeds are small enough to sort directly.
+const ROLLUP_ORDER = {
+  // Communities only (version 2 rows); the front page's Top is top_posts
+  top: 'pscore DESC, pid DESC',
+  controversial: 'controversy(pscore, pcomments) DESC, pid DESC',
+  comments: 'pcomments DESC, pid DESC',
+  new: 'pcreated DESC, pid DESC',
+  old: 'pcreated ASC, pid ASC',
+};
+const MAX_ROLLUP_DEPTH = 10000;
+
+const commentCount = `(CASE WHEN num_comments ~ '^[0-9]{1,9}$' THEN num_comments::integer ELSE 0 END)`;
+const LIVE_ORDER = {
+  top: 'score DESC',
+  new: 'created_utc DESC',
+  old: 'created_utc ASC',
+  comments: `${commentCount} DESC`,
+  controversial: `controversy(score::integer, ${commentCount}) DESC`,
+};
+
+export class FeedNotReadyError extends Error {}
+
+// The leading `limit` posts after `offset` for one rollup sort. The listing
+// is exact up to the point where a month that had more posts than the rollup
+// kept runs out of kept posts; anything past that could be missing posts, so
+// the page stops there and is flagged `truncated`.
+async function queryRollup(subreddit, tables, sort, limit, offset, minVersion = 1) {
+  if (!(await hasTable('feed_rollup'))) throw new FeedNotReadyError();
+  const months = tables.map((t) => `${t.month}-01`);
+  const db = await connectToDatabase();
+  const { rows: covered } = await db.query(
+    "SELECT count(*)::int AS n FROM feed_rollup WHERE subreddit = '' AND month = ANY($1::date[]) AND version >= $2",
+    [months, minVersion]
+  );
+  if (covered[0].n !== months.length) throw new FeedNotReadyError();
+  if (offset >= MAX_ROLLUP_DEPTH) return Object.assign([], { truncated: true });
+
+  const order = ROLLUP_ORDER[sort];
+  const { rows } = await timedQuery(
+    `SELECT to_char(month, 'YYYY-MM') AS month, posts, kept, pid::text AS pid, rn FROM (
+       SELECT r.month, r.posts, r.kept, p.*, row_number() OVER (PARTITION BY r.month ORDER BY ${order}) AS rn
+         FROM feed_rollup r, unnest(r.ids, r.created, r.scores, r.comments) AS p(pid, pcreated, pscore, pcomments)
+        WHERE r.subreddit = $1 AND r.month = ANY($2::date[])
+     ) ranked
+     WHERE rn <= kept
+     ORDER BY ${order}
+     LIMIT $3`,
+    [subreddit || '', months, Math.min(offset + limit, MAX_ROLLUP_DEPTH)]
+  );
+  const { page, truncated } = rollupPage(rows, offset, limit);
+  const posts = await postsByIds(page.map((r) => ({ month: r.month, id: BigInt(r.pid).toString(36) })));
+  return Object.assign(posts, { truncated });
+}
+
+// rows: the listing's first offset + limit rollup entries in order, each with
+// its rank in its month (rn), the month's post count and how many were kept.
+export function rollupPage(rows, offset, limit, maxDepth = MAX_ROLLUP_DEPTH) {
+  const end = rows.findIndex((r) => Number(r.posts) > Number(r.kept) && Number(r.rn) === Number(r.kept));
+  const exact = end === -1 ? rows : rows.slice(0, end + 1);
+  return {
+    page: exact.slice(offset, offset + limit),
+    truncated: (end !== -1 && exact.length < offset + limit) || offset + limit > maxDepth,
+  };
+}
+
+// Full list rows for (month, id) pairs, in the order given
+async function postsByIds(entries) {
+  if (entries.length === 0) return [];
+  const tables = new Map((await getSubmissionTables()).map((t) => [t.month, t]));
+  const byMonth = new Map();
+  for (const { month, id } of entries) {
+    if (!tables.has(month)) continue;
+    if (!byMonth.has(month)) byMonth.set(month, []);
+    byMonth.get(month).push(id);
+  }
+  const params = [];
+  const branches = [...byMonth].map(([month, ids]) => {
+    params.push(ids);
+    const t = tables.get(month);
+    return `SELECT ${selectColumns(t, POST_LIST_COLUMNS)} FROM "${t.name}" WHERE id = ANY($${params.length})`;
+  });
+  if (branches.length === 0) return [];
+  const { rows } = await timedQuery(branches.join(' UNION ALL '), params);
+  const found = new Map(rows.map((row) => [row.id, normalizePost(row)]));
+  return entries.map((e) => found.get(e.id)).filter(Boolean);
+}
+
 export async function queryPosts({ startDate, endDate, subreddit, author, sort = 'top', limit = 25, offset = 0 }) {
   const allTables = await getSubmissionTables();
   let tables = author ? allTables : tablesInRange(allTables, startDate, endDate);
@@ -213,6 +316,16 @@ export async function queryPosts({ startDate, endDate, subreddit, author, sort =
     const top = await queryTopPosts(tables, limit, offset);
     if (top) return top;
   }
+  // A community's Top through the monthly indexes reads the leading post of
+  // every month (hundreds of random reads); use the rollup once it has Top
+  if (subreddit && !author && sort === 'top') {
+    try {
+      return await queryRollup(subreddit, tables, 'top', limit, offset, 2);
+    } catch (error) {
+      if (!(error instanceof FeedNotReadyError)) throw error;
+    }
+  }
+  if (!author && sort !== 'top' && ROLLUP_ORDER[sort]) return queryRollup(subreddit, tables, sort, limit, offset);
 
   const params = [];
   const where = [];
@@ -237,7 +350,7 @@ export async function queryPosts({ startDate, endDate, subreddit, author, sort =
   if (branches.length === 0) return [];
 
   const clause = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-  const orderBy = sort === 'new' ? 'created_utc DESC' : 'score DESC';
+  const orderBy = LIVE_ORDER[sort] || LIVE_ORDER.top;
   params.push(limit, offset);
   const text = `SELECT * FROM (${branches.join(' UNION ALL ')}) AS posts${clause} ORDER BY ${orderBy} LIMIT $${params.length - 1} OFFSET $${params.length}`;
   const { rows } = await timedQuery(text, params);
@@ -300,7 +413,8 @@ async function fetchChildren(tables, parentIds) {
 
 // Fetch comments below `rootFullnames` (t3_ or t1_ ids) down to `depth` levels.
 // Nodes at the bottom get `more: true` when they have unloaded children.
-export async function fetchCommentTree(tables, rootFullnames, { depth = 4, limit, offset = 0 } = {}) {
+export async function fetchCommentTree(tables, rootFullnames, { depth = 4, limit, offset = 0, sort = 'top' } = {}) {
+  const order = COMMENT_ORDER[sort] || COMMENT_ORDER.top;
   let roots;
   if (limit) {
     const branches = tables
@@ -308,7 +422,7 @@ export async function fetchCommentTree(tables, rootFullnames, { depth = 4, limit
       .map((t) => `SELECT ${selectColumns(t, COMMENT_COLUMNS)} FROM "${t.name}" WHERE parent_id = ANY($1)`);
     if (branches.length === 0) return [];
     const { rows } = await timedQuery(
-      `${branches.join(' UNION ALL ')} ORDER BY score DESC LIMIT $2 OFFSET $3`,
+      `${branches.join(' UNION ALL ')} ORDER BY ${order.sql}, id LIMIT $2 OFFSET $3`,
       [rootFullnames, limit, offset]
     );
     roots = rows.map(normalizeComment);
@@ -326,7 +440,7 @@ export async function fetchCommentTree(tables, rootFullnames, { depth = 4, limit
       byParent.get(key).push(child);
     }
     for (const node of level) {
-      node.replies = (byParent.get(node.id) || []).sort((a, b) => b.score - a.score);
+      node.replies = (byParent.get(node.id) || []).sort(order.compare);
     }
     level = children;
   }
@@ -339,7 +453,7 @@ export async function fetchCommentTree(tables, rootFullnames, { depth = 4, limit
     const parents = new Set(rows.map((r) => r.parent_id.replace(/^t1_/, '')));
     for (const node of level) node.more = parents.has(node.id);
   }
-  return roots.sort((a, b) => b.score - a.score);
+  return roots.sort(order.compare);
 }
 
 const toMonth = (date) => (date ? new Date(date).toISOString().slice(0, 7) : null);
@@ -508,4 +622,42 @@ export async function getUserStats(author) {
     firstPost: row.first_post ? Number(row.first_post) : null,
     lastPost: row.last_post ? Number(row.last_post) : null,
   };
+}
+
+// A random thread: from the front page, one of a month's top posts (top_posts,
+// NSFW left out); in a community, one of the posts feed_rollup kept for a
+// month picked in proportion to how much the community posted then. Both
+// tables are small, so this never waits on the monthly tables' disk.
+export async function randomPostId(subreddit) {
+  if (!subreddit) {
+    if (!(await hasTable('top_posts'))) return null;
+    const { rows } = await timedQuery(
+      `SELECT id FROM top_posts
+        WHERE coalesce(lower(over_18), 'false') <> 'true' AND id IS NOT NULL
+        ORDER BY random() LIMIT 1`,
+      [],
+      5000
+    );
+    return rows[0]?.id || null;
+  }
+  if (!(await hasTable('subreddit_monthly')) || !(await hasTable('feed_rollup'))) return null;
+  const { rows } = await timedQuery(
+    `SELECT f.ids[1 + floor(random() * cardinality(f.ids))::int]::text AS id
+       FROM (SELECT month FROM subreddit_monthly WHERE subreddit = $1
+              ORDER BY -ln(1 - random()) / posts LIMIT 1) m
+       JOIN feed_rollup f ON f.subreddit = $1 AND f.month = m.month`,
+    [subreddit],
+    5000
+  );
+  return rows[0]?.id ? BigInt(rows[0].id).toString(36) : null;
+}
+
+export async function getSubredditHistory(subreddit) {
+  if (!(await hasTable('subreddit_monthly'))) return [];
+  const { rows } = await timedQuery(
+    `SELECT to_char(month, 'YYYY-MM') AS month, posts FROM subreddit_monthly WHERE subreddit = $1 ORDER BY month`,
+    [subreddit],
+    5000
+  );
+  return rows.map((r) => ({ month: r.month, posts: Number(r.posts) }));
 }

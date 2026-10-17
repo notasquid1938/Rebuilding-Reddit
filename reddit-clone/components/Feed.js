@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import PostCard, { PostSkeleton } from './PostCard';
+import { SORT_LABELS } from '@/lib/sorts';
 import styles from '@/styles/Feed.module.css';
 
 const PAGE_SIZE = 15;
@@ -21,7 +22,7 @@ function buildUrl({ startDate, endDate, subreddit, author, sort }, page) {
 // Remount with a different `key` whenever the query changes.
 const Feed = ({ query, context = 'feed', emptyMessage = 'No posts found for this period.' }) => {
   const cacheKey = JSON.stringify(query);
-  const [state, setState] = useState(() => feedCache.get(cacheKey) || { posts: [], page: 0, done: false });
+  const [state, setState] = useState(() => feedCache.get(cacheKey) || { posts: [], page: 0, done: false, truncated: false });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const sentinelRef = useRef(null);
@@ -40,10 +41,16 @@ const Feed = ({ query, context = 'feed', emptyMessage = 'No posts found for this
       const response = await fetch(buildUrl(query, state.page + 1));
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Failed to load posts');
+      const truncated = response.headers.get('X-Feed-Truncated') === '1';
       setState((prev) => {
         const seen = new Set(prev.posts.map((p) => p.id));
         const fresh = data.filter((p) => !seen.has(p.id));
-        return { posts: [...prev.posts, ...fresh], page: prev.page + 1, done: data.length < PAGE_SIZE };
+        return {
+          posts: [...prev.posts, ...fresh],
+          page: prev.page + 1,
+          done: truncated || data.length < PAGE_SIZE,
+          truncated,
+        };
       });
     } catch (err) {
       setError(err.message);
@@ -73,7 +80,7 @@ const Feed = ({ query, context = 'feed', emptyMessage = 'No posts found for this
     return () => observer.disconnect();
   }, [loadMore, state.done, state.page, error]);
 
-  const { posts, done } = state;
+  const { posts, done, truncated } = state;
 
   return (
     <div className={styles.feed}>
@@ -114,7 +121,15 @@ const Feed = ({ query, context = 'feed', emptyMessage = 'No posts found for this
         </div>
       )}
 
-      {!loading && done && posts.length > 0 && <p className={styles.end}>You&apos;ve reached the end of this feed.</p>}
+      {!loading && done && posts.length > 0 && (
+        <p className={styles.end}>
+          {truncated
+            ? `That's as far as ${SORT_LABELS[query.sort] || 'this sort'} goes for this date range.${
+                !query.startDate || query.startDate !== query.endDate ? ' Pick a shorter range to see more.' : ''
+              }`
+            : "You've reached the end of this feed."}
+        </p>
+      )}
 
       <div ref={sentinelRef} className={styles.sentinel} />
     </div>

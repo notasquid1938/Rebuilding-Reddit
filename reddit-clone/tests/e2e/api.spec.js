@@ -54,6 +54,49 @@ test.describe('Posts', () => {
     expect(top.map((p) => p.id)).toEqual(['b001', 'c001', 'e001', 'd001']);
   });
 
+  test('front page sorts other than top', async ({ request }) => {
+    const ids = async (sort, range = 'startDate=2005-12&endDate=2005-12') =>
+      (await get(request, `/api/Posts?${range}&sort=${sort}&page=1&limit=3`)).map((p) => p.id);
+    expect(await ids('controversial')).toEqual(['b003', 'b002', 'b001']);
+    expect(await ids('comments')).toEqual(['b003', 'b002', 'b001']);
+    expect(await ids('new')).toEqual(['b005', 'b003', 'b002']);
+    expect(await ids('old', 'all=1')).toEqual(['b100', 'b101', 'b102']);
+    expect(await ids('new', 'all=1')).toEqual(['e001', 'e104', 'e103']);
+  });
+
+  test('community feed sorts other than top', async ({ request }) => {
+    const newest = await get(request, '/api/Posts?subreddit=programming&sort=new&page=1&limit=2');
+    expect(newest.map((p) => p.id)).toEqual(['d001', 'd107']);
+    const oldest = await get(request, '/api/Posts?subreddit=programming&sort=old&page=1&limit=2');
+    expect(oldest.map((p) => p.id)).toEqual(['b101', 'b104']);
+    const discussed = await get(request, '/api/Posts?subreddit=programming&sort=comments&page=1&limit=1');
+    expect(discussed.map((p) => p.id)).toEqual(['b002']);
+  });
+
+  test('pages through a rollup sort without gaps or duplicates', async ({ request }) => {
+    const ids = [];
+    for (let page = 1; page < 20; page++) {
+      const response = await request.get(`/api/Posts?startDate=2005-06&endDate=2006-12&sort=new&page=${page}&limit=15`);
+      expect(response.headers()['x-feed-truncated']).toBeUndefined();
+      const posts = await response.json();
+      ids.push(...posts.map((p) => p.id));
+      if (posts.length < 15) break;
+    }
+    expect(ids).toHaveLength(FIXTURE.postsInDefaultRange);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  test('user feed sorts', async ({ request }) => {
+    const ids = async (sort) => (await get(request, `/api/Posts?author=alice&sort=${sort}&page=1&limit=10`)).map((p) => p.id);
+    expect(await ids('old')).toEqual(['b001', 'c001', 'd001', 'e001']);
+    expect((await ids('comments'))[0]).toBe('b001');
+  });
+
+  test('unknown sorts fall back to top', async ({ request }) => {
+    const posts = await get(request, '/api/Posts?startDate=2005-06&endDate=2006-12&sort=hot&page=1&limit=1');
+    expect(posts[0].id).toBe('b001');
+  });
+
   test('string scores and timestamps from old dumps are numbers', async ({ request }) => {
     const posts = await get(request, '/api/Posts?author=alice&page=1&limit=1');
     expect(typeof posts[0].score).toBe('number');
@@ -63,8 +106,8 @@ test.describe('Posts', () => {
   });
 
   for (const [query, why] of [
-    ['sort=new', 'new needs an author'],
     ['startDate=2005-6', 'bad month'],
+    ['startDate=2020-13', 'month 13'],
     ['subreddit=bad%20name', 'bad subreddit'],
     ['author=%5Bdeleted%5D', 'bad author'],
     ['page=10001', 'page out of range'],
@@ -101,15 +144,26 @@ test.describe('Comments', () => {
   test('builds the tree across monthly tables', async ({ request }) => {
     const { available, comments } = await get(request, '/api/Comments?id=b001&month=2005-12');
     expect(available).toBe(true);
-    expect(comments.map((c) => c.id)).toEqual(['k001', 'm001', 'k004']);
+    expect(comments.map((c) => c.id)).toEqual(['k001', 'm001', 'k004', 'k005']);
     expect(comments[0].replies[0]).toMatchObject({ id: 'k002', author: 'alice' });
     expect(comments[0].replies[0].replies[0]).toMatchObject({ id: 'k003', body: 'Nested reply' });
     expect(comments[2]).toMatchObject({ author: '[deleted]', body: '[removed]' });
   });
 
+  test('sorts comments', async ({ request }) => {
+    const ids = async (sort) =>
+      (await get(request, `/api/Comments?id=b001&month=2005-12&sort=${sort}`)).comments.map((c) => c.id);
+    expect(await ids('new')).toEqual(['m001', 'k005', 'k004', 'k001']);
+    expect(await ids('old')).toEqual(['k001', 'k004', 'k005', 'm001']);
+    expect(await ids('controversial')).toEqual(['k005', 'k001', 'm001', 'k004']);
+    const { comments } = await get(request, '/api/Comments?id=b001&month=2005-12&sort=controversial');
+    expect(comments[0].controversial).toBe(true);
+    expect(comments[1].controversial).toBe(false);
+  });
+
   test('pages top-level comments', async ({ request }) => {
     const { comments } = await get(request, '/api/Comments?id=b001&month=2005-12&page=2&commentsPerPage=2');
-    expect(comments.map((c) => c.id)).toEqual(['k004']);
+    expect(comments.map((c) => c.id)).toEqual(['k004', 'k005']);
   });
 
   test('reports months without comment dumps', async ({ request }) => {
@@ -117,7 +171,7 @@ test.describe('Comments', () => {
   });
 
   test('counts comments', async ({ request }) => {
-    expect(await get(request, '/api/CommentCount?id=b001&month=2005-12')).toEqual({ available: true, totalComments: 5 });
+    expect(await get(request, '/api/CommentCount?id=b001&month=2005-12')).toEqual({ available: true, totalComments: 6 });
   });
 
   test('loads replies', async ({ request }) => {
@@ -160,6 +214,45 @@ test.describe('TopCommunities', () => {
   test('for a date range', async ({ request }) => {
     const { communities } = await get(request, '/api/TopCommunities?startDate=2010-01&endDate=2010-12');
     expect(communities).toEqual([{ name: 'AskHistory', posts: 6 }]);
+  });
+
+  test('rejects months that do not exist', async ({ request }) => {
+    await get(request, '/api/TopCommunities?startDate=2020-13&endDate=2020-12', 400);
+  });
+});
+
+test.describe('SubredditHistory', () => {
+  test('lists posts per month', async ({ request }) => {
+    expect(await get(request, '/api/SubredditHistory?name=PROGRAMMING')).toEqual({
+      months: [
+        { month: '2005-12', posts: 15 },
+        { month: '2006-01', posts: 11 },
+        { month: '2006-02', posts: 4 },
+      ],
+    });
+    expect(await get(request, '/api/SubredditHistory?name=neverexisted')).toEqual({ months: [] });
+    await get(request, '/api/SubredditHistory?name=bad%20name', 400);
+  });
+});
+
+test.describe('Random', () => {
+  test('redirects to a thread', async ({ request }) => {
+    const response = await request.get('/random', { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers().location).toMatch(/^\/Thread\/[0-9a-z]+$/);
+  });
+
+  test('stays in a community', async ({ request }) => {
+    for (let i = 0; i < 5; i++) {
+      const location = (await request.get('/random?subreddit=programming', { maxRedirects: 0 })).headers().location;
+      const id = location.split('/').pop();
+      expect((await get(request, `/api/ID?id=${id}`)).subreddit).toBe('programming');
+    }
+  });
+
+  test('falls back to the community page when it has no posts', async ({ request }) => {
+    const response = await request.get('/random?subreddit=neverexisted', { maxRedirects: 0 });
+    expect(response.headers().location).toBe('/r/neverexisted');
   });
 });
 
@@ -208,6 +301,21 @@ test.describe('Sitemaps', () => {
 
   test('month sitemap lists threads', async ({ request }) => {
     const xml = await (await request.get('/Sitemap/2005_12-1')).text();
-    expect(xml).toContain('/Thread/b001');
+    for (const id of ['b001', 'b005', 'b100', 'b113']) expect(xml).toContain(`/Thread/${id}<`);
+    expect(xml.match(/<url>/g)).toHaveLength(45);
+  });
+
+  test('batches and index pages past the end are 404s', async ({ request }) => {
+    expect((await request.get('/Sitemap/2005_12-2')).status()).toBe(404);
+    expect((await request.get('/Sitemap/1999_01-1')).status()).toBe(404);
+    expect((await request.get('/sitemap.xml?page=2')).status()).toBe(404);
+    expect((await request.get('/sitemap.xml?page=x')).status()).toBe(404);
+  });
+
+  test('robots.txt lists the sitemap index', async ({ request }) => {
+    const text = await (await request.get('/robots.txt')).text();
+    expect(text).toContain('User-agent: *');
+    expect(text).toMatch(/^Sitemap: http:\/\/127\.0\.0\.1:\d+\/sitemap\.xml$/m);
+    expect(text).not.toContain('page=2');
   });
 });

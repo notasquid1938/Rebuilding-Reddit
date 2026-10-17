@@ -32,7 +32,7 @@ def one(cur, query, params=None):
 def test_every_month_loaded_with_expected_counts(db):
     db.execute("SELECT file, rows_loaded, rows_failed FROM loader_state WHERE file LIKE 'R%' ORDER BY file")
     assert db.fetchall() == [
-        ('RC_2005-12.zst', 4, 0),
+        ('RC_2005-12.zst', 5, 0),
         ('RC_2006-01.zst', 1, 0),
         ('RS_2005-12.zst', 45, 2),  # the two malformed lines are counted, not loaded
         ('RS_2006-01.zst', 32, 0),
@@ -61,6 +61,11 @@ def test_values_survive_the_round_trip(db):
     assert selftext == 'Line one\n\n**bold** text,\ta tab and a NUL char &amp;gt; quoted'
     assert (score, created) == (300, 1134259200)
     assert one(db, "SELECT title FROM rs_2006_01 WHERE id = 'c002'")[0] == 'Title with\ta tab and\nnewline'
+
+
+def test_comment_controversiality_stored_as_a_number(db):
+    db.execute("SELECT id, controversiality FROM rc_2005_12 WHERE id IN ('k001', 'k005') ORDER BY id")
+    assert db.fetchall() == [('k001', 0), ('k005', 1)]
 
 
 def test_string_numbers_converted(db):
@@ -92,6 +97,45 @@ def test_top_posts(db):
     assert one(db, 'SELECT count(*) FROM top_posts')[0] == 45 + 32 + 11 + 6
 
 
+def test_feed_rollup_covers_every_month(db):
+    assert one(db, "SELECT count(*) FROM feed_rollup WHERE subreddit = ''")[0] == len(MONTHS)
+    assert one(db, "SELECT posts, kept, cardinality(ids) FROM feed_rollup WHERE subreddit = '' AND month = '2005-12-01'") \
+        == (45, 1000, 45)
+    assert one(db, 'SELECT min(version) FROM feed_rollup')[0] == 2  # keeps community Top too
+    db.execute("SELECT subreddit, posts FROM feed_rollup WHERE month = '2005-12-01' AND subreddit <> '' ORDER BY 1")
+    assert db.fetchall() == [('pics', 1), ('programming', 15), ('reddit.com', 16), ('science', 13)]
+
+
+def rollup_ids(db, subreddit):
+    db.execute("""SELECT array(SELECT base36_to_bigint(x) FROM unnest(%s::text[]) x ORDER BY 1),
+                         array(SELECT unnest(ids) ORDER BY 1)
+                    FROM feed_rollup WHERE subreddit = %s AND month = '2005-12-01'""", (EXPECTED[subreddit], subreddit))
+    return db.fetchone()
+
+
+# With 2 kept per subreddit and 3 for the front page, the leaders of each sort:
+EXPECTED = {
+    # Controversial and Most comments: b002 then the highest id among ties at
+    # 0 comments (b111); New: b005, b002; Old: the first fillers b101, b104;
+    # Top: b002, b005
+    'programming': ['b002', 'b111', 'b005', 'b101', 'b104'],
+    # Controversial / Most comments: b003, b002, b001; New: b005, b003, b002; Old: b100-b102
+    '': ['b001', 'b002', 'b003', 'b005', 'b100', 'b101', 'b102'],
+}
+
+
+def test_feed_rollup_keeps_the_leaders_of_each_sort(db):
+    db.execute("CALL refresh_feed_rollup('rs_2005_12', 2, 3)")
+    try:
+        for subreddit in EXPECTED:
+            expected, kept = rollup_ids(db, subreddit)
+            assert kept == expected, subreddit
+        assert one(db, "SELECT posts, kept FROM feed_rollup WHERE subreddit = 'programming' AND month = '2005-12-01'") \
+            == (15, 2)
+    finally:
+        db.execute("CALL refresh_feed_rollup('rs_2005_12')")
+
+
 def test_subreddits_metadata(db):
     row = one(db, "SELECT entry_count, first_seen, last_seen, post_count FROM subreddits_metadata WHERE name = 'programming'")
     assert row[0] == 3
@@ -117,14 +161,20 @@ def test_banned_subreddit_kept_with_name_only(db):
     assert one(db, "SELECT title, subscribers FROM subreddit_about WHERE name = 'GoneSub'") == (None, None)
 
 
-def run_loader(*args):
-    env = dict(os.environ, LOADER_WORKERS='2')
+def run_loader(*args, **env_overrides):
+    env = dict(os.environ, LOADER_WORKERS='2', **env_overrides)
     return subprocess.run([sys.executable, os.path.join(ROOT, 'dump_loader.py'), *args],
                           env=env, capture_output=True, text=True, check=True).stdout
 
 
 def test_rerun_is_a_no_op():
     assert 'submissions: 0 file(s) to load' in run_loader('submissions')
+
+
+def test_worker_count_per_kind():
+    output = run_loader('comments', LOADER_COMMENTS_WORKERS='1')
+    assert 'comments: 0 file(s) to load with 1 worker(s)' in output
+    assert 'with 2 worker(s)' in run_loader('submissions', LOADER_COMMENTS_WORKERS='1')
 
 
 def test_month_reloads_in_place(db):

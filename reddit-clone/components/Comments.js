@@ -5,11 +5,12 @@ import UserAvatar from './UserAvatar';
 import { VoteButtons, ShareButton } from './PostActions';
 import { PlusCircleIcon } from './Icons';
 import { timeAgo, fullDate, formatCount } from '@/lib/format';
+import { COMMENT_SORTS, SORT_LABELS } from '@/lib/sorts';
 import styles from '@/styles/Comments.module.css';
 
 const PAGE_SIZE = 20;
 
-const Comment = ({ comment, month, postId, opAuthor, depth = 0 }) => {
+const Comment = ({ comment, month, postId, opAuthor, sort, depth = 0 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [replies, setReplies] = useState(comment.replies);
   const [loading, setLoading] = useState(false);
@@ -19,7 +20,7 @@ const Comment = ({ comment, month, postId, opAuthor, depth = 0 }) => {
     setLoading(true);
     setError(false);
     try {
-      const params = new URLSearchParams({ commentId: comment.id });
+      const params = new URLSearchParams({ commentId: comment.id, sort });
       if (month) params.set('month', month);
       const response = await fetch(`/api/Replies?${params}`);
       if (!response.ok) throw new Error();
@@ -84,6 +85,11 @@ const Comment = ({ comment, month, postId, opAuthor, depth = 0 }) => {
             <Markdown className={styles.body}>{comment.body}</Markdown>
             <div className={styles.actions}>
               <VoteButtons score={comment.score} size="sm" />
+              {comment.controversial && (
+                <span className={styles.controversial} title="Controversial: lots of upvotes and downvotes">
+                  †
+                </span>
+              )}
               <ShareButton path={`/Thread/${postId}#t1_${comment.id}`} size="sm" />
             </div>
 
@@ -96,6 +102,7 @@ const Comment = ({ comment, month, postId, opAuthor, depth = 0 }) => {
                     month={month}
                     postId={postId}
                     opAuthor={opAuthor}
+                    sort={sort}
                     depth={depth + 1}
                   />
                 ))}
@@ -116,6 +123,7 @@ const Comment = ({ comment, month, postId, opAuthor, depth = 0 }) => {
 
 const CommentSection = ({ post }) => {
   const [comments, setComments] = useState([]);
+  const [sort, setSort] = useState('top');
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState('loading'); // loading | ready | unavailable | error
   const [hasMore, setHasMore] = useState(false);
@@ -127,7 +135,7 @@ const CommentSection = ({ post }) => {
       if (page === 1) setStatus('loading');
       else setLoadingMore(true);
       try {
-        const params = new URLSearchParams({ id: post.id, page: String(page), commentsPerPage: String(PAGE_SIZE) });
+        const params = new URLSearchParams({ id: post.id, page: String(page), commentsPerPage: String(PAGE_SIZE), sort });
         if (post.month) params.set('month', post.month);
         const response = await fetch(`/api/Comments?${params}`);
         if (!response.ok) throw new Error();
@@ -153,15 +161,30 @@ const CommentSection = ({ post }) => {
     return () => {
       active = false;
     };
-  }, [post.id, post.month, page]);
+  }, [post.id, post.month, page, sort]);
+
+  const changeSort = (next) => {
+    if (next === sort) return;
+    setComments([]);
+    setHasMore(false);
+    setPage(1);
+    setSort(next);
+  };
 
   return (
     <section className={styles.section} aria-label="Comments">
-      {comments.length > 0 && (
+      {(comments.length > 0 || (status === 'loading' && sort !== 'top')) && (
         <div className={styles.sectionHeader}>
-          <span className={styles.sortLabel}>
-            Sort by: <strong>Top</strong>
-          </span>
+          <label className={styles.sortLabel}>
+            Sort by:{' '}
+            <select value={sort} onChange={(e) => changeSort(e.target.value)} className={styles.sortSelect}>
+              {COMMENT_SORTS.map((s) => (
+                <option key={s} value={s}>
+                  {SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
 
@@ -189,7 +212,14 @@ const CommentSection = ({ post }) => {
       )}
 
       {comments.map((comment) => (
-        <Comment key={comment.id} comment={comment} month={post.month} postId={post.id} opAuthor={post.author} />
+        <Comment
+          key={comment.id}
+          comment={comment}
+          month={post.month}
+          postId={post.id}
+          opAuthor={post.author}
+          sort={sort}
+        />
       ))}
 
       {status === 'ready' && hasMore && (

@@ -1,4 +1,0 @@
-# Allow all crawlers
-User-agent: *
-Allow: /
-Sitemap: https://redditrebuilt.com/sitemap.xml

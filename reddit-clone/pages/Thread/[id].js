@@ -7,7 +7,7 @@ import SubredditIcon from '@/components/SubredditIcon';
 import Markdown from '@/components/Markdown';
 import PostMedia, { LinkThumbnail, LinkDomain } from '@/components/PostMedia';
 import { PostTags } from '@/components/PostCard';
-import { VoteButtons, CommentsButton, ShareButton } from '@/components/PostActions';
+import { VoteButtons, CommentsButton, ShareButton, SaveButton } from '@/components/PostActions';
 import CommentSection from '@/components/Comments';
 import { CommunityCard, SidebarFooter } from '@/components/Sidebar';
 import { BackIcon } from '@/components/Icons';
@@ -146,6 +146,7 @@ function PostDetail({ post }) {
           <VoteButtons score={post.score} />
           <CommentsButton count={post.num_comments} />
           <ShareButton path={`/Thread/${post.id}`} />
+          <SaveButton post={post} />
         </div>
       </article>
 

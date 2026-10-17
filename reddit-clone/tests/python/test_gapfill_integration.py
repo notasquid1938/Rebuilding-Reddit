@@ -37,6 +37,11 @@ def dry_run():
 
 @pytest.fixture(scope='module')
 def first_run(dry_run):
+    # Like months loaded by older versions, which lack columns their first line didn't have
+    conn = connect()
+    with conn, conn.cursor() as cur:
+        cur.execute('ALTER TABLE rs_2006_02 DROP COLUMN spoiler')
+    conn.close()
     return run('gapfill_loader.py')
 
 
@@ -80,7 +85,8 @@ def test_recovered_posts_join_their_months(db):
         'Recovered December post', 'frank', 42)
     assert one(db, "SELECT title FROM rs_2005_12 WHERE id = 'b0ab'")[0] == 'Recovered post with media'
     assert one(db, "SELECT subreddit, created_utc FROM rs_2006_01 WHERE id = 'c0aa'") == ('BannedIn2015', 1136505600)
-    assert one(db, "SELECT count(*) FROM rs_2006_02 WHERE id = 'd0aa'")[0] == 1
+    # rs_2006_02 has no spoiler column; the rest of the post still merges
+    assert one(db, "SELECT title FROM rs_2006_02 WHERE id = 'd0aa'")[0] == 'Another banned community post'
 
 
 def test_archived_posts_are_untouched(db):

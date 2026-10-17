@@ -1,4 +1,4 @@
-const MONTH_RE = /^\d{4}-\d{2}$/;
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 // Repeated parameters (?from=a&from=b) arrive as arrays
 const isMonth = (value) => typeof value === 'string' && MONTH_RE.test(value);
 
@@ -14,4 +14,20 @@ export function rangeFromQuery(query, fallback) {
 
 export function rangeToQuery(range) {
   return range ? { from: range.from, to: range.to } : { t: 'all' };
+}
+
+function nextMonth(month) {
+  const [y, m] = month.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+}
+
+// [{ month, posts }] in order -> every month from the first to the last, 0 where missing
+export function fillMonths(months) {
+  if (months.length === 0) return [];
+  const counts = new Map(months.map((m) => [m.month, m.posts]));
+  const filled = [];
+  for (let m = months[0].month; m <= months[months.length - 1].month; m = nextMonth(m)) {
+    filled.push({ month: m, posts: counts.get(m) || 0 });
+  }
+  return filled;
 }

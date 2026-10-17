@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  selectColumns, normalizePost, normalizeComment, tablesInRange, isMonth, SUBREDDIT_RE, AUTHOR_RE, ID_RE,
+  selectColumns, normalizePost, normalizeComment, tablesInRange, isMonth, SUBREDDIT_RE, AUTHOR_RE, ID_RE, rollupPage,
 } from '@/lib/submissions';
 
 const table = (month, columns) => ({ name: `rs_${month.replace('-', '_')}`, month, columns: new Set(columns) });
@@ -73,6 +73,9 @@ describe('input validation', () => {
   it('accepts real names and rejects injection attempts', () => {
     expect(isMonth('2005-06')).toBe(true);
     expect(isMonth('2005-6')).toBe(false);
+    expect(isMonth('2020-13')).toBe(false);
+    expect(isMonth('2020-00')).toBe(false);
+    expect(isMonth('2020-12')).toBe(true);
     expect(isMonth(undefined)).toBe(false);
     expect(SUBREDDIT_RE.test('reddit.com')).toBe(true);
     expect(SUBREDDIT_RE.test('a"; DROP TABLE x')).toBe(false);
@@ -80,5 +83,39 @@ describe('input validation', () => {
     expect(AUTHOR_RE.test('[deleted]')).toBe(false);
     expect(ID_RE.test('b001')).toBe(true);
     expect(ID_RE.test('b0 01')).toBe(false);
+  });
+});
+
+describe('rollupPage', () => {
+  // Two months: A had 10 posts and kept 3, B had 2 and kept both
+  const row = (month, rn, posts, kept) => ({ month, pid: `${month}${rn}`, rn: String(rn), posts, kept });
+  const listing = [row('A', 1, 10, 3), row('B', 1, 2, 3), row('A', 2, 10, 3), row('B', 2, 2, 3), row('A', 3, 10, 3)];
+
+  it('pages through the exact part of the listing', () => {
+    expect(rollupPage(listing.slice(0, 2), 0, 2)).toEqual({ page: listing.slice(0, 2), truncated: false });
+    expect(rollupPage(listing.slice(0, 4), 2, 2)).toEqual({ page: listing.slice(2, 4), truncated: false });
+  });
+
+  it('stops after a month runs out of kept posts', () => {
+    // A's third kept post ends the exact listing: A's fourth could rank next
+    expect(rollupPage(listing, 4, 2)).toEqual({ page: [listing[4]], truncated: true });
+    expect(rollupPage(listing, 6, 2)).toEqual({ page: [], truncated: true });
+  });
+
+  it('a month that kept all of its posts never truncates', () => {
+    const small = [row('B', 1, 2, 3), row('B', 2, 2, 3)];
+    expect(rollupPage(small, 0, 5)).toEqual({ page: small, truncated: false });
+  });
+
+  it('caps the depth', () => {
+    expect(rollupPage([], 9995, 10, 10000).truncated).toBe(true);
+  });
+});
+
+describe('normalizeComment controversiality', () => {
+  it('flags comments Reddit marked controversial', () => {
+    expect(normalizeComment({ id: 'a', controversiality: '1' }).controversial).toBe(true);
+    expect(normalizeComment({ id: 'a', controversiality: 0 }).controversial).toBe(false);
+    expect(normalizeComment({ id: 'a' }).controversial).toBe(false);
   });
 });

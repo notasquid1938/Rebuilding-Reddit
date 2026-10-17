@@ -5,11 +5,12 @@ Reddit Rebuilt is a self-hosted archive of Reddit: every post, comment and subre
 
 The website copies Reddit's current interface:
 
-- **Home feed**: top posts for any date range, with infinite scroll and a "browse by year" sidebar
-- **Communities** (`/r/<name>`): banner, icon, description, sidebar text, member count and the community's top posts, including communities that were later banned or made private
-- **Threads** (`/Thread/<id>`): full post, markdown, images, YouTube embeds, NSFW/spoiler blurring and threaded comments
-- **User pages** (`/User/<name>`): every archived post by an account, newest or top first
+- **Home feed**: posts for any date range sorted by Top, Controversial, Most comments, New or Old, with infinite scroll and a "browse by year" sidebar
+- **Communities** (`/r/<name>`): banner, icon, description, sidebar text, member count and the community's posts in the same sorts, including communities that were later banned or made private
+- **Threads** (`/Thread/<id>`): full post, markdown, images, YouTube embeds, NSFW/spoiler blurring and threaded comments sorted by Top, New, Old or Controversial
+- **User pages** (`/User/<name>`): every archived post by an account, in any of the feed sorts
 - **Search**: community autocomplete across every subreddit in the archive
+- **Controversial** is estimated: the dumps have no downvotes, so posts rank by how many comments they drew for their net score. Comments use the controversiality flag Reddit recorded
 - **Dark mode**, mobile layout and Reddit-style URLs: swap `reddit.com` for the site's domain in any `/r/<sub>/comments/<id>/…`, `/u/<name>` or `/user/<name>` link and it opens the archived copy
 
 ## How it works
@@ -61,10 +62,10 @@ Everything is resumable. Stopping the containers, rebooting or killing a load mi
 | Data (2005-06 → 2026-08) | Rows | Database size, site columns | Database size, all fields |
 | --- | --- | --- | --- |
 | Submissions | ~3.6 billion | ~2.5–3 TB | ~7 TB |
-| Comments | ~28 billion | ~9 TB | ~15 TB |
+| Comments | ~28 billion | ~3.3× the `.zst` size, ~10 TB | ~15 TB |
 | Compressed dumps (downloads) | | ~1.2 TB posts, ~3 TB comments | |
 
-By default only submissions are loaded, with the columns the website uses. Comments are switched on with `LOAD_COMMENTS=1` once there's room (see below).
+Submissions and comments are loaded with the columns the website uses. Comments load oldest month first until the disk would drop below `LOADER_MIN_FREE_GB`; the months that don't fit wait on disk and load on a later run once there is room.
 
 ### Running it
 
@@ -95,10 +96,13 @@ Set these on the `loader` service in `docker-compose.yml`:
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `LOAD_COMMENTS` | `0` | `1` downloads and loads comments as well as submissions |
+| `LOAD_COMMENTS` | `1` | `0` loads submissions only |
+| `FETCH_COMMENTS` | `0` | `1` also downloads comment months that aren't on disk (`0` loads only the ones already there) |
+| `LOADER_MIN_FREE_GB` | `100` | A month only loads if the disk keeps this much free throughout; the rest wait for a later run (unset or `0` disables the check) |
 | `LOADER_COLUMNS` | `site` | `site` keeps only the fields the website shows (about ⅓ the size); `all` keeps every field in the dumps |
-| `DELETE_LOADED_DUMPS` | `comments` | Kinds whose `.zst` is deleted after a load with zero skipped rows, to save space |
+| `DELETE_LOADED_DUMPS` | `submissions,comments` | Kinds whose `.zst` is deleted after a load with zero skipped rows, to save space |
 | `LOADER_WORKERS` | `4` | Months loaded in parallel |
+| `LOADER_COMMENTS_WORKERS` | `2` | Comment months loaded in parallel (each saturates a hard disk more than a post month; overrides `LOADER_WORKERS`) |
 | `LOADER_TABLESPACE` | `archive_hdd` | Tablespace for loaded months (created on the `pg_archive` volume) |
 | `GAPFILL` | `1` | `0` skips the 2006–2015 gap-fill corpus |
 | `GAPFILL_EXCLUDE` | `jailbait,preteen_girls,creepshots,thefappening,beatingwomen` | Communities the gap-fill never adds (comma list, replaces the default) |

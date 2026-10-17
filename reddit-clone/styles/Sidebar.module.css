@@ -209,3 +209,38 @@ a.communityItem:hover {
   font-size: 12px;
   font-weight: 600;
 }
+
+.chart {
+  display: block;
+  width: 100%;
+  height: 64px;
+}
+
+.chartBar {
+  cursor: pointer;
+}
+
+.chartHit {
+  fill: transparent;
+}
+
+.chartFill {
+  fill: var(--text-weaker);
+}
+
+.chartFillActive {
+  fill: var(--brand);
+}
+
+.chartBar:hover .chartFill,
+.chartBar:hover .chartFillActive {
+  fill: var(--link);
+}
+
+.chartAxis {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0 8px;
+  font-size: 11px;
+  color: var(--text-weak);
+}

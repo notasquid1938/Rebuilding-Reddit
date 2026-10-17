@@ -1,5 +1,6 @@
 import { checkRateLimit, getClientIp } from '../../middleware/rateLimit';
 import { commentTablesForMonth, fetchCommentTree, isMonth, ID_RE } from '@/lib/submissions';
+import { isCommentSort } from '@/lib/sorts';
 
 export default async function handler(req, res) {
   // Rate limiting
@@ -10,6 +11,7 @@ export default async function handler(req, res) {
 
   try {
     const { id, page, month, commentsPerPage = 20 } = req.query;
+    const sort = isCommentSort(req.query.sort) ? req.query.sort : 'top';
 
     if (!id) {
       return res.status(400).json({ error: 'Missing post ID' });
@@ -44,6 +46,7 @@ export default async function handler(req, res) {
       depth: 4,
       limit: perPage,
       offset: (pageNum - 1) * perPage,
+      sort,
     });
 
     res.setHeader('Cache-Control', 'public, max-age=3600');

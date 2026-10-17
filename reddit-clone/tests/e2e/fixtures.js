@@ -32,7 +32,7 @@ export const FIXTURE = {
   months: ['2005-12', '2006-01', '2006-02', '2010-06'],
   topPost: { id: 'b001', title: 'Top & best post of December', subreddit: 'reddit.com', author: 'alice' },
   selfPost: { id: 'b002', title: 'What is <markdown>?' },
-  nsfwPost: { id: 'b003' },
+  nsfwPost: { id: 'b003', title: 'NSFW spoiler post' },
   lockedPost: { id: 'b005' },
   laterPost: { id: 'e001', title: 'History question from 2010', subreddit: 'AskHistory' },
   postsInDefaultRange: 45 + 32 + 11,
