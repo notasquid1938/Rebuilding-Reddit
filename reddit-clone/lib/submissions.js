@@ -144,17 +144,64 @@ export function normalizeComment(row) {
   };
 }
 
+// A query holds a lock on every month table and index it reads until it
+// ends, and Postgres' shared lock table has room for about 6,400. A query over
+// every month takes ~1,400, so a handful at once (crawlers walking user pages)
+// fill it and every other query fails with "out of shared memory", the
+// loader's included. Queries over many months therefore run at most
+// WIDE_QUERY_LIMIT at a time, without parallel workers (which lock the same
+// tables again); the rest wait briefly, then get a BusyError.
+export const WIDE_TABLES = 32;
+const WIDE_QUERY_LIMIT = 2;
+const WIDE_QUERY_WAIT_MS = 15000;
+let wideRunning = 0;
+const wideQueue = [];
+
+export class BusyError extends Error {}
+
+function acquireWide() {
+  if (wideRunning < WIDE_QUERY_LIMIT) {
+    wideRunning++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const waiter = { resolve };
+    waiter.timer = setTimeout(() => {
+      wideQueue.splice(wideQueue.indexOf(waiter), 1);
+      reject(new BusyError('Too many wide queries'));
+    }, WIDE_QUERY_WAIT_MS);
+    wideQueue.push(waiter);
+  });
+}
+
+function releaseWide() {
+  const next = wideQueue.shift();
+  if (next) {
+    clearTimeout(next.timer);
+    next.resolve(); // the slot passes straight to the next waiter
+  } else {
+    wideRunning--;
+  }
+}
+
 // Run a query with a per-statement timeout so one expensive request can't
-// pin a pool connection indefinitely.
-export async function timedQuery(text, params, timeoutMs = 20000) {
-  const db = await connectToDatabase();
-  const client = await db.connect();
+// pin a pool connection indefinitely. `wide` marks queries over many months.
+export async function timedQuery(text, params, timeoutMs = 20000, { wide = false } = {}) {
+  if (wide) await acquireWide();
   try {
-    await client.query(`SET statement_timeout = ${Math.floor(timeoutMs)}`);
-    return await client.query(text, params);
+    const db = await connectToDatabase();
+    const client = await db.connect();
+    try {
+      await client.query(`SET statement_timeout = ${Math.floor(timeoutMs)}`);
+      if (wide) await client.query('SET max_parallel_workers_per_gather = 0');
+      return await client.query(text, params);
+    } finally {
+      await client.query('RESET statement_timeout').catch(() => {});
+      if (wide) await client.query('RESET max_parallel_workers_per_gather').catch(() => {});
+      client.release();
+    }
   } finally {
-    await client.query('RESET statement_timeout').catch(() => {});
-    client.release();
+    if (wide) releaseWide();
   }
 }
 
@@ -353,7 +400,7 @@ export async function queryPosts({ startDate, endDate, subreddit, author, sort =
   const orderBy = LIVE_ORDER[sort] || LIVE_ORDER.top;
   params.push(limit, offset);
   const text = `SELECT * FROM (${branches.join(' UNION ALL ')}) AS posts${clause} ORDER BY ${orderBy} LIMIT $${params.length - 1} OFFSET $${params.length}`;
-  const { rows } = await timedQuery(text, params);
+  const { rows } = await timedQuery(text, params, 20000, { wide: branches.length > WIDE_TABLES });
   return rows.map(normalizePost);
 }
 
@@ -612,7 +659,8 @@ export async function getUserStats(author) {
             MIN(created_utc) AS first_post, MAX(created_utc) AS last_post
        FROM (${branches.join(' UNION ALL ')}) AS posts`,
     [author],
-    20000
+    20000,
+    { wide: branches.length > WIDE_TABLES }
   );
   const row = rows[0];
   return {
