@@ -12,7 +12,7 @@ import { CommunityCard, TopCommunitiesCard, SidebarFooter } from '@/components/S
 import { addRecentCommunity } from '@/lib/hooks';
 import { formatCount, monthLabel } from '@/lib/format';
 import { rangeFromQuery, rangeToQuery } from '@/lib/range';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { FEED_SORTS, sortFromQuery, withSort } from '@/lib/sorts';
 import styles from '@/styles/Profile.module.css';
 
@@ -111,6 +111,7 @@ function CommunityPage({ name, info }) {
           content={info?.about?.publicDescription || `Archived top posts from r/${name}, rebuilt from Reddit's history.`}
         />
         <meta property="og:title" content={`r/${name}`} />
+        <link rel="canonical" href={`${SITE_URL}/r/${encodeURIComponent(name)}`} />
       </Head>
 
       <FeedControls sort={sort} sorts={FEED_SORTS} onSortChange={setSort} range={range} onRangeChange={setRange} />

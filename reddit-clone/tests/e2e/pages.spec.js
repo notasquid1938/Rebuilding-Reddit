@@ -350,6 +350,41 @@ test.describe('Theme', () => {
   });
 });
 
+// Checked in the server's HTML, before any script runs, as a crawler first sees it
+test.describe('Search engine markup', () => {
+  const canonical = (html) => /<link rel="canonical" href="([^"]+)"/.exec(html)?.[1];
+  // The origin is SITE_URL as built; the path is what matters
+  const path = (url) => new URL(url).pathname;
+
+  test('every page type names its canonical URL', async ({ request }) => {
+    const pages = {
+      '/?sort=new&from=2006-01': '/',
+      '/r/programming?sort=controversial': '/r/programming',
+      '/User/alice?sort=top': '/User/alice',
+      [`/Thread/${FIXTURE.selfPost.id}`]: `/Thread/${FIXTURE.selfPost.id}`,
+    };
+    for (const [url, expected] of Object.entries(pages)) {
+      expect(path(canonical(await (await request.get(url)).text())), url).toBe(expected);
+    }
+  });
+
+  test('threads carry DiscussionForumPosting data', async ({ request }) => {
+    const html = await (await request.get(`/Thread/${FIXTURE.selfPost.id}`)).text();
+    const json = /<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/s.exec(html)?.[1];
+    const data = JSON.parse(json);
+    expect(data['@type']).toBe('DiscussionForumPosting');
+    expect(data.headline).toBe(FIXTURE.selfPost.title);
+    expect(path(data.url)).toBe(`/Thread/${FIXTURE.selfPost.id}`);
+    expect(data.text).toContain('bold');
+    expect(path(data.isPartOf.url)).toBe('/r/programming');
+    expect(data.interactionStatistic.map((s) => s.interactionType)).toEqual([
+      'https://schema.org/LikeAction', 'https://schema.org/CommentAction',
+    ]);
+    // The title's "<" is escaped, so post text can't end the script element
+    expect(json).not.toContain('<markdown>');
+  });
+});
+
 test('unknown pages are a 404', async ({ page }) => {
   const response = await page.goto('/does-not-exist');
   expect(response.status()).toBe(404);

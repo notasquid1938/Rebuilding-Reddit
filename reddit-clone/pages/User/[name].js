@@ -6,11 +6,17 @@ import FeedControls from '@/components/FeedControls';
 import UserAvatar from '@/components/UserAvatar';
 import { UserCard, SidebarFooter } from '@/components/Sidebar';
 import { PostSkeleton } from '@/components/PostCard';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { USER_SORTS, sortFromQuery, withSort } from '@/lib/sorts';
 import styles from '@/styles/Profile.module.css';
 
 const AUTHOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+// Rendered on the server so the title and canonical link are in the HTML
+export async function getServerSideProps({ res }) {
+  res.setHeader('Cache-Control', 'public, s-maxage=3600');
+  return { props: {} };
+}
 
 function UserPage() {
   const router = useRouter();
@@ -28,6 +34,7 @@ function UserPage() {
       <Head>
         <title>{name ? `u/${name} - ${SITE_NAME}` : SITE_NAME}</title>
         {name && <meta name="description" content={`Archive of posts by u/${name}`} />}
+        {valid && <link rel="canonical" href={`${SITE_URL}/User/${name}`} />}
       </Head>
 
       {!router.isReady ? (

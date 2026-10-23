@@ -15,6 +15,7 @@ import { addRecentCommunity } from '@/lib/hooks';
 import { canGoBack } from '@/lib/navigation';
 import { decodeEntities, timeAgo, fullDate } from '@/lib/format';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
+import { threadStructuredData, jsonLd } from '@/lib/structuredData';
 import styles from '@/styles/Thread.module.css';
 
 export async function getServerSideProps({ params, res }) {
@@ -86,6 +87,7 @@ function PostDetail({ post }) {
         <meta property="og:description" content={description} />
         <meta property="og:site_name" content={SITE_NAME} />
         {post.over_18 && <meta name="rating" content="adult" />}
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(threadStructuredData(post)) }} />
       </Head>
 
       <article className={styles.post}>
