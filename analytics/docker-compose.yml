@@ -53,8 +53,10 @@ services:
     command:
       - |
         while true; do
-          if ls /logs/redditrebuilt*.log* >/dev/null 2>&1; then
-            zcat -f /logs/redditrebuilt*.log* | goaccess - --log-format=CADDY --anonymize-ip \
+          if ls /logs/redditrebuilt*.log >/dev/null 2>&1; then
+            # Rolled-over logs are gzipped; busybox zcat can't pass plain files through
+            { for f in /logs/redditrebuilt*.log.gz; do [ -e "$$f" ] && zcat "$$f"; done; cat /logs/redditrebuilt*.log; } \
+              | goaccess - --log-format=CADDY --anonymize-ip \
               --html-report-title='Reddit Rebuilt traffic' --no-progress -o /report/index.tmp.html \
               && mv /report/index.tmp.html /report/index.html
           fi
