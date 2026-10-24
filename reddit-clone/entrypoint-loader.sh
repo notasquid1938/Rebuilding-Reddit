@@ -90,6 +90,10 @@ run_cycle() {
 
   echo "--- Refreshing site lookup tables ---"
   "${PSQL[@]}" -f /app/scripts/site_tables.sql -f /app/scripts/build_subreddit_metadata.sql
+  # One-off index of the months each author posted in (user pages); a no-op
+  # once built, and refresh_month keeps it current. Before the comments, which
+  # would otherwise compete for the archive disk.
+  "${PSQL[@]}" -c "CALL build_author_months(${LOADER_TABLESPACE:+'$LOADER_TABLESPACE'})"
 
   # Comments last: they take days, and nothing above depends on them
   if [ "${LOAD_COMMENTS:-0}" = "1" ]; then

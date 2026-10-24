@@ -4,7 +4,8 @@
 --   subreddit_monthly posts per subreddit per month   -> community feeds skip empty months
 --   top_posts         top 1000 posts of each month     -> unfiltered "Top" feeds
 --   feed_rollup       candidates for the other sorts    -> Controversial / Most comments / New / Old feeds
--- refresh_month(table) (re)computes all four for one rs_YYYY_MM table.
+--   author_months     the months each author posted in  -> user pages skip the other months
+-- refresh_month(table) (re)computes all five for one rs_YYYY_MM table.
 -- Idempotent; run by dump_loader.py at startup.
 
 CREATE OR REPLACE FUNCTION base36_to_bigint(value text) RETURNS bigint
@@ -103,6 +104,7 @@ BEGIN
        FROM %I ORDER BY score DESC NULLS LAST LIMIT %s', m, cols, tbl, top_n);
 
   CALL refresh_feed_rollup(tbl);
+  CALL refresh_author_months(tbl);
 END $$;
 
 
@@ -188,4 +190,152 @@ BEGIN
           UNION (SELECT id, created, score, comments FROM feed_rollup_scan ORDER BY created ASC, id ASC LIMIT per_month)) x
   HAVING count(*) > 0;
   DROP TABLE feed_rollup_scan;
+END $$;
+
+
+-- The months each author posted in, so a user page reads only those months
+-- instead of every monthly table (~1,400 locks and a random read per month on
+-- the archive disk). One row per author rather than per author and month:
+-- that would be ~850 million rows. Months are numbered from 2005-01
+-- (month_number). The website only relies on it once build_author_months()
+-- has filled it in for every month (a site_builds row); until then user pages
+-- read every month as before.
+CREATE TABLE IF NOT EXISTS author_months (
+  author text PRIMARY KEY,
+  months smallint[] NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS site_builds (
+  name     text PRIMARY KEY,
+  built_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE OR REPLACE FUNCTION month_number(m date) RETURNS smallint
+LANGUAGE sql IMMUTABLE STRICT AS $$
+  SELECT ((extract(year FROM m)::integer - 2005) * 12 + extract(month FROM m)::integer - 1)::smallint
+$$;
+
+-- Placeholders that aren't accounts
+CREATE OR REPLACE FUNCTION is_account(author text) RETURNS boolean
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT author IS NOT NULL AND author NOT IN ('', '[deleted]', '[removed]', 'None')
+$$;
+
+-- Adds one month's authors. Run for every month as it loads (refresh_month),
+-- and again when the gap-fill adds posts to it.
+CREATE OR REPLACE PROCEDURE refresh_author_months(tbl text)
+LANGUAGE plpgsql AS $$
+DECLARE
+  n smallint := month_number(to_date(substr(tbl, 4), 'YYYY_MM'));
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = tbl::regclass AND attname = 'author' AND NOT attisdropped) THEN
+    RETURN;
+  END IF;
+  -- Months loading in parallel share most of their authors; upserting them at
+  -- the same time deadlocks, so one month at a time (until the caller commits)
+  PERFORM pg_advisory_xact_lock(4242002);
+  EXECUTE format(
+    'INSERT INTO author_months AS a (author, months)
+     SELECT DISTINCT author, ARRAY[%s]::smallint[] FROM %I WHERE is_account(author)
+     ON CONFLICT (author) DO UPDATE
+       SET months = (SELECT array_agg(DISTINCT x ORDER BY x) FROM unnest(a.months || EXCLUDED.months) x)
+     WHERE NOT a.months @> EXCLUDED.months', n, tbl);
+END $$;
+
+-- One-off fill of author_months from every month already loaded. Upserting
+-- month by month would be a random read per author on a table this size, so
+-- each month's authors are copied to a staging table (one sequential scan per
+-- month) and grouped at the end. The staging table is split by author into 32
+-- parts that are grouped and dropped one at a time, so the archive disk
+-- (`work_tablespace`) needs ~40 GB at most for the full archive; the result
+-- (~20 GB) goes to the default tablespace, where each new month's upserts are
+-- cheap. Whatever refresh_month added meanwhile is kept. Every step commits,
+-- so an interrupted build continues where it stopped. Run in its own session:
+--   CALL build_author_months('archive_hdd');
+CREATE OR REPLACE PROCEDURE build_author_months(work_tablespace text DEFAULT NULL)
+LANGUAGE plpgsql AS $$
+DECLARE
+  parts constant integer := 32;
+  tbl text;
+  part text;
+  ts text := CASE WHEN work_tablespace IS NULL THEN '' ELSE format(' TABLESPACE %I', work_tablespace) END;
+BEGIN
+  IF EXISTS (SELECT 1 FROM site_builds WHERE name = 'author_months') THEN
+    RAISE NOTICE 'author_months is already built';
+    RETURN;
+  END IF;
+  -- Each month's authors in one pass over its table, which is cheaper than
+  -- the author index here: most archive-disk pages aren't marked all-visible,
+  -- so an index-only scan would still visit the table at random
+  PERFORM set_config('enable_indexscan', 'off', false);
+  PERFORM set_config('enable_indexonlyscan', 'off', false);
+  PERFORM set_config('enable_bitmapscan', 'off', false);
+  PERFORM set_config('work_mem', '1GB', false);
+  PERFORM set_config('maintenance_work_mem', '2GB', false);
+  IF work_tablespace IS NOT NULL THEN
+    PERFORM set_config('temp_tablespaces', work_tablespace, false);
+  END IF;
+
+  -- Staging (skipped once grouping has started, when author_months_new exists)
+  IF to_regclass('author_months_new') IS NULL THEN
+    IF to_regclass('author_months_stage') IS NULL THEN
+      CREATE UNLOGGED TABLE author_months_stage (author text NOT NULL, month smallint NOT NULL) PARTITION BY HASH (author);
+      FOR i IN 0 .. parts - 1 LOOP
+        EXECUTE format('CREATE UNLOGGED TABLE author_months_stage_%s PARTITION OF author_months_stage
+                        FOR VALUES WITH (MODULUS %s, REMAINDER %s)', i, parts, i) || ts;
+      END LOOP;
+    END IF;
+    CREATE TABLE IF NOT EXISTS author_months_staged (table_name text PRIMARY KEY);
+    COMMIT;
+    -- Until no month is left, so months that finish loading meanwhile are included
+    LOOP
+      SELECT c.relname INTO tbl FROM pg_class c
+       WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r' AND c.relname ~ '^rs_\d{4}_\d{2}$'
+         AND NOT EXISTS (SELECT 1 FROM author_months_staged s WHERE s.table_name = c.relname)
+       ORDER BY c.relname LIMIT 1;
+      EXIT WHEN tbl IS NULL;
+      RAISE NOTICE '% staging %', clock_timestamp(), tbl;
+      IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = tbl::regclass AND attname = 'author' AND NOT attisdropped) THEN
+        EXECUTE format('INSERT INTO author_months_stage SELECT DISTINCT author, %s FROM %I WHERE is_account(author)',
+                       month_number(to_date(substr(tbl, 4), 'YYYY_MM')), tbl);
+      END IF;
+      INSERT INTO author_months_staged VALUES (tbl);
+      COMMIT;
+    END LOOP;
+    CREATE TABLE author_months_new (author text NOT NULL, months smallint[] NOT NULL);
+    COMMIT;
+  END IF;
+
+  -- Grouping, one part at a time; each (author, month) was staged once, so no
+  -- de-duplication is needed
+  LOOP
+    SELECT c.relname INTO part FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid
+     WHERE i.inhparent = to_regclass('author_months_stage') ORDER BY c.relname LIMIT 1;
+    EXIT WHEN part IS NULL;
+    RAISE NOTICE '% grouping %', clock_timestamp(), part;
+    EXECUTE format('INSERT INTO author_months_new
+                    SELECT author, array_agg(month ORDER BY month) FROM %I GROUP BY author', part);
+    EXECUTE format('DROP TABLE %I', part);
+    COMMIT;
+  END LOOP;
+  RAISE NOTICE '% indexing', clock_timestamp();
+  IF to_regclass('author_months_new_pkey') IS NULL THEN
+    ALTER TABLE author_months_new ADD CONSTRAINT author_months_new_pkey PRIMARY KEY (author);
+  END IF;
+  COMMIT;
+
+  -- Fold in what refresh_month added meanwhile, holding off its upserts until the swap
+  LOCK TABLE author_months IN SHARE ROW EXCLUSIVE MODE;
+  INSERT INTO author_months_new AS a SELECT author, months FROM author_months
+  ON CONFLICT (author) DO UPDATE
+    SET months = (SELECT array_agg(DISTINCT x ORDER BY x) FROM unnest(a.months || EXCLUDED.months) x)
+  WHERE NOT a.months @> EXCLUDED.months;
+  DROP TABLE author_months;
+  ALTER TABLE author_months_new RENAME TO author_months;
+  ALTER INDEX author_months_new_pkey RENAME TO author_months_pkey;
+  INSERT INTO site_builds (name) VALUES ('author_months');
+  DROP TABLE IF EXISTS author_months_stage;
+  DROP TABLE IF EXISTS author_months_staged;
+  COMMIT;
+  RAISE NOTICE '% author_months built', clock_timestamp();
 END $$;

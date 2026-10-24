@@ -54,6 +54,7 @@ export DATA_DIR="$WORK/data"
 "$PYTHON" dump_loader.py comments
 "$PYTHON" subreddits_loader.py
 cat scripts/site_tables.sql scripts/build_subreddit_metadata.sql | psql -q -v ON_ERROR_STOP=1 2>&1 | grep -v NOTICE || true
+psql -q -v ON_ERROR_STOP=1 -c 'CALL build_author_months()' 2>&1 | grep -v NOTICE || true
 
 echo "--- Loader tests"
 INTEGRATION=1 "$PYTHON" -m pytest tests/python -q -p no:cacheprovider

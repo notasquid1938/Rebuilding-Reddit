@@ -115,6 +115,7 @@ And on the `reddit-clone` (website) service:
 | `POSTGRES_URL` | `postgres://postgres:postgres@db:5432/Reddit-Rebuilt` | Database connection |
 | `DATA_DIR` | `/Data` | Where icons (`reddit/icons/`) and archived Imgur images (`imgur/images/`) are read from |
 | `SITE_URL` | `https://redditrebuilt.com` | Absolute URLs in the sitemap and canonical links |
+| `QUERY_CACHE_MB` | `256` | Memory for cached feeds, threads, comments and user stats (`0` turns the cache off). Nothing is written to disk |
 
 ### Analytics
 
@@ -163,6 +164,9 @@ redditrebuilt.com {
 | `post_id_ranges` | Base-36 id range of each month, for thread lookups |
 | `subreddit_monthly` | Posts per subreddit per month |
 | `top_posts` | Top 1000 posts of each month |
+| `feed_rollup` | Each community's (and the front page's) leading posts per month for every sort |
+| `author_months` | The months each author posted in, so user pages read only those months. Built once by `build_author_months()` (~20 GB for the full archive; up to ~40 GB of staging on the archive disk while it runs), then kept current as months load |
+| `site_builds` | One-off builds that have finished (the website uses `author_months` only once it's listed here) |
 | `subreddits_metadata` | Per-subreddit totals and first/last active month (search, community stats) |
 | `subreddit_about` | About pages: title, descriptions, members, creation date, icon/banner URLs |
 | `icon_fetch_attempts` | Icon download results, so dead URLs aren't retried every cycle |

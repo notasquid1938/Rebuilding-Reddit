@@ -1,6 +1,7 @@
 // Server-side helpers for querying the monthly rs_YYYY_MM / rc_YYYY_MM tables.
 // Never import this file from client components.
 import connectToDatabase from '@/db';
+import { queryCache } from '@/lib/cache';
 
 const TABLE_CACHE_MS = 5 * 60 * 1000;
 const tableCache = {};
@@ -240,6 +241,40 @@ async function subredditMonths(subreddit) {
   return new Set(rows.map((r) => r.month));
 }
 
+// Whether a one-off build (scripts/site_tables.sql) has finished
+const builds = new Map();
+async function isBuilt(name) {
+  const cached = builds.get(name);
+  if (cached && Date.now() - cached.time < TABLE_CACHE_MS) return cached.built;
+  let built = false;
+  if (await hasTable('site_builds')) {
+    const db = await connectToDatabase();
+    const { rows } = await db.query('SELECT 1 FROM site_builds WHERE name = $1', [name]);
+    built = rows.length > 0;
+  }
+  builds.set(name, { time: Date.now(), built });
+  return built;
+}
+
+// author_months numbers months from 2005-01 (month_number() in site_tables.sql)
+export const monthFromNumber = (n) => `${2005 + Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, '0')}`;
+
+// Months in which an author posted (from author_months), so user pages only
+// touch those tables; null until author_months has been built for every month.
+async function authorMonths(author) {
+  if (!(await isBuilt('author_months'))) return null;
+  const db = await connectToDatabase();
+  const { rows } = await db.query('SELECT months FROM author_months WHERE author = $1', [author]);
+  return new Set((rows[0]?.months || []).map(monthFromNumber));
+}
+
+// The monthly tables to search for an author's posts
+async function authorTables(author) {
+  const tables = (await getSubmissionTables()).filter((t) => t.columns.has('author'));
+  const months = await authorMonths(author);
+  return months ? tables.filter((t) => months.has(t.month)) : tables;
+}
+
 const TOP_POSTS_PER_MONTH = 1000;
 
 // Unfiltered "Top" pages come from top_posts (each month's top 1000) when
@@ -350,9 +385,18 @@ async function postsByIds(entries) {
   return entries.map((e) => found.get(e.id)).filter(Boolean);
 }
 
-export async function queryPosts({ startDate, endDate, subreddit, author, sort = 'top', limit = 25, offset = 0 }) {
-  const allTables = await getSubmissionTables();
-  let tables = author ? allTables : tablesInRange(allTables, startDate, endDate);
+// Results are cached in memory (lib/cache.js) for as long as the data can't
+// change in a way that matters: the loader adds a month at most daily
+const HOUR = 60 * 60 * 1000;
+
+export function queryPosts({ startDate, endDate, subreddit, author, sort = 'top', limit = 25, offset = 0 }) {
+  const args = { startDate, endDate, subreddit, author, sort, limit, offset };
+  const key = `posts:${[startDate, endDate, subreddit, author, sort, limit, offset].join('|')}`;
+  return queryCache.cached(key, HOUR, () => loadPosts(args));
+}
+
+async function loadPosts({ startDate, endDate, subreddit, author, sort, limit, offset }) {
+  let tables = author ? await authorTables(author) : tablesInRange(await getSubmissionTables(), startDate, endDate);
   if (subreddit && !author) {
     const months = await subredditMonths(subreddit);
     if (months) tables = tables.filter((t) => months.has(t.month));
@@ -422,7 +466,12 @@ async function tablesForId(tables, id) {
   return tables.filter((t) => names.has(t.name) || !summarised.has(t.name));
 }
 
-export async function getPostById(id) {
+// Missing ids are remembered briefly, so a newly loaded month's posts show up soon
+export function getPostById(id) {
+  return queryCache.cached(`post:${id}`, (post) => (post ? 24 * HOUR : 10 * 60 * 1000), () => loadPostById(id));
+}
+
+async function loadPostById(id) {
   const tables = await tablesForId(await getSubmissionTables(), id);
   const branches = tables
     .filter((t) => t.columns.has('id'))
@@ -460,7 +509,12 @@ async function fetchChildren(tables, parentIds) {
 
 // Fetch comments below `rootFullnames` (t3_ or t1_ ids) down to `depth` levels.
 // Nodes at the bottom get `more: true` when they have unloaded children.
-export async function fetchCommentTree(tables, rootFullnames, { depth = 4, limit, offset = 0, sort = 'top' } = {}) {
+export function fetchCommentTree(tables, rootFullnames, { depth = 4, limit, offset = 0, sort = 'top' } = {}) {
+  const key = `comments:${tables.map((t) => t.name).join(',')}|${rootFullnames.join(',')}|${depth}|${limit}|${offset}|${sort}`;
+  return queryCache.cached(key, HOUR, () => loadCommentTree(tables, rootFullnames, { depth, limit, offset, sort }));
+}
+
+async function loadCommentTree(tables, rootFullnames, { depth, limit, offset, sort }) {
   const order = COMMENT_ORDER[sort] || COMMENT_ORDER.top;
   let roots;
   if (limit) {
@@ -507,7 +561,11 @@ const toMonth = (date) => (date ? new Date(date).toISOString().slice(0, 7) : nul
 
 // Archive stats (subreddits_metadata) merged with the community's about page
 // (subreddit_about, from the Arctic Shift subreddit snapshots).
-export async function getSubredditInfo(name) {
+export function getSubredditInfo(name) {
+  return queryCache.cached(`community:${name}`, HOUR, () => loadSubredditInfo(name));
+}
+
+async function loadSubredditInfo(name) {
   const [hasMeta, hasAbout, hasMonthly] = await Promise.all([
     hasTable('subreddits_metadata'),
     hasTable('subreddit_about'),
@@ -650,9 +708,13 @@ async function queryTopCommunities(startDate, endDate, limit) {
   return rows.map((row) => ({ name: row.subreddit, posts: Number(row.posts) }));
 }
 
-export async function getUserStats(author) {
-  const tables = (await getSubmissionTables()).filter((t) => t.columns.has('author'));
-  if (tables.length === 0) return null;
+export function getUserStats(author) {
+  return queryCache.cached(`user:${author}`, 6 * HOUR, () => loadUserStats(author));
+}
+
+async function loadUserStats(author) {
+  const tables = await authorTables(author);
+  if (tables.length === 0) return { name: author, posts: 0, karma: 0, firstPost: null, lastPost: null };
   const branches = tables.map((t) => `SELECT score, created_utc FROM "${t.name}" WHERE author = $1`);
   const { rows } = await timedQuery(
     `SELECT COUNT(*) AS posts, COALESCE(SUM(score), 0) AS karma,

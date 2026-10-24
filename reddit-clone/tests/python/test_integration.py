@@ -136,6 +136,87 @@ def test_feed_rollup_keeps_the_leaders_of_each_sort(db):
         db.execute("CALL refresh_feed_rollup('rs_2005_12')")
 
 
+def authors_by_month(db):
+    """{author: [month numbers]} straight from the monthly tables"""
+    found = {}
+    for month in MONTHS:
+        year, mon = map(int, month.split('_'))
+        db.execute(f'SELECT DISTINCT author FROM rs_{month} WHERE is_account(author)')
+        for (author,) in db.fetchall():
+            found.setdefault(author, []).append((year - 2005) * 12 + mon - 1)
+    return {author: sorted(months) for author, months in found.items()}
+
+
+def author_months(db):
+    db.execute('SELECT author, months FROM author_months')
+    return dict(db.fetchall())
+
+
+def test_author_months_lists_every_month_each_author_posted_in(db):
+    expected = authors_by_month(db)
+    assert len(expected) > 5
+    assert author_months(db) == expected
+    assert '[deleted]' not in expected
+    assert one(db, "SELECT count(*) FROM site_builds WHERE name = 'author_months'")[0] == 1
+    assert one(db, "SELECT count(*) FROM pg_class WHERE relname IN ('author_months_stage', 'author_months_staged')")[0] == 0
+
+
+def test_author_months_build_keeps_what_loads_added_meanwhile(db):
+    # A month loaded during the build adds its authors to the live table
+    db.execute("DELETE FROM site_builds WHERE name = 'author_months'")
+    db.execute("INSERT INTO author_months VALUES ('only_in_live', '{200}'), ('alice', '{200}') "
+               "ON CONFLICT (author) DO UPDATE SET months = author_months.months || EXCLUDED.months")
+    try:
+        db.execute('CALL build_author_months()')
+        built = author_months(db)
+        assert built.pop('only_in_live') == [200]
+        assert built.pop('alice')[-1] == 200
+        expected = authors_by_month(db)
+        expected.pop('alice')
+        assert built == expected
+    finally:
+        db.execute("DELETE FROM author_months WHERE author = 'only_in_live'")
+        db.execute("UPDATE author_months SET months = array_remove(months, 200::smallint) WHERE author = 'alice'")
+    assert author_months(db) == authors_by_month(db)
+
+
+def test_author_months_build_resumes_after_an_interruption(db):
+    import psycopg2
+    db.execute("DELETE FROM site_builds WHERE name = 'author_months'")
+    interrupted = 0
+    # Cut the build off at ever later points until it finishes
+    for timeout_ms in [5, 10, 20, 40, 80, 160, 320, 640, 1280, 0]:
+        db.execute(f'SET statement_timeout = {timeout_ms}')
+        try:
+            db.execute('CALL build_author_months()')
+            break
+        except psycopg2.errors.QueryCanceled:
+            interrupted += 1
+        finally:
+            db.execute('RESET statement_timeout')
+    assert interrupted > 0
+    assert author_months(db) == authors_by_month(db)
+    assert one(db, "SELECT count(*) FROM pg_class WHERE relname LIKE 'author\\_months\\_%%' AND relkind IN ('r', 'p')")[0] == 0
+
+
+def test_author_months_build_runs_once(db):
+    db.execute('CALL build_author_months()')
+    assert author_months(db) == authors_by_month(db)
+    assert one(db, "SELECT count(*) FROM site_builds WHERE name = 'author_months'")[0] == 1
+
+
+def test_refresh_month_adds_new_authors(db):
+    db.execute("DELETE FROM author_months WHERE author IN (SELECT author FROM rs_2006_01)")
+    db.execute("CALL refresh_author_months('rs_2006_01')")
+    db.execute("CALL refresh_author_months('rs_2006_01')")  # repeating it changes nothing
+    expected = authors_by_month(db)
+    rebuilt = {a: m for a, m in author_months(db).items() if a in {r for r in expected if 12 in expected[r]}}
+    assert all(months == [12] for months in rebuilt.values())
+    for month in MONTHS:
+        db.execute(f"CALL refresh_author_months('rs_{month}')")
+    assert author_months(db) == expected
+
+
 def test_subreddits_metadata(db):
     row = one(db, "SELECT entry_count, first_seen, last_seen, post_count FROM subreddits_metadata WHERE name = 'programming'")
     assert row[0] == 3

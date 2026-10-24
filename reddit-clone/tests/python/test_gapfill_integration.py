@@ -112,6 +112,21 @@ def test_lookup_tables_refreshed(db):
     assert one(db, "SELECT table_name FROM post_id_ranges WHERE base36_to_bigint('c0aa') BETWEEN id_min AND id_max")[0] == 'rs_2006_01'
 
 
+def test_authors_of_recovered_posts_added_to_author_months(db):
+    db.execute("SELECT author FROM rs_2006_01 WHERE id = 'c0aa'")
+    author = db.fetchone()[0]
+    assert 12 in one(db, 'SELECT months FROM author_months WHERE author = %s', (author,))[0]  # 2006-01
+    # Every author of every month, as the monthly tables have them
+    db.execute("""SELECT count(*) FROM (
+                    SELECT DISTINCT author, month_number(to_date(substr(t, 4), 'YYYY_MM')) AS m
+                      FROM (SELECT 'rs_2005_12' AS t, author FROM rs_2005_12 UNION ALL
+                            SELECT 'rs_2006_01', author FROM rs_2006_01 UNION ALL
+                            SELECT 'rs_2006_02', author FROM rs_2006_02) p
+                     WHERE is_account(author)) x
+                   WHERE NOT EXISTS (SELECT 1 FROM author_months a WHERE a.author = x.author AND x.m = ANY(a.months))""")
+    assert db.fetchone()[0] == 0
+
+
 def test_completion_recorded_and_rerun_is_a_no_op(db):
     assert one(db, 'SELECT table_name, rows_loaded, rows_failed FROM loader_state WHERE file = %s', (STATE_KEY,)) == (
         'rs_extra', 6, 2)
