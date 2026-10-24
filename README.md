@@ -116,6 +116,42 @@ And on the `reddit-clone` (website) service:
 | `DATA_DIR` | `/Data` | Where icons (`reddit/icons/`) and archived Imgur images (`imgur/images/`) are read from |
 | `SITE_URL` | `https://redditrebuilt.com` | Absolute URLs in the sitemap and canonical links |
 
+### Analytics
+
+`analytics/docker-compose.yml` runs two dashboards, separate from the site:
+
+- **Umami** (port 3002): visitors, pages, referrers, countries and devices, from a cookie-free script in every page. It doesn't see crawlers. Custom events: `page-not-found` (with the path) and `community-not-archived` (with the community name).
+- **GoAccess** (port 3004): a report rebuilt every 10 minutes from the reverse proxy's access log, which includes crawlers, bandwidth and error responses. IPs are anonymised.
+
+```bash
+cd analytics
+printf 'UMAMI_DB_PASSWORD=%s\nUMAMI_APP_SECRET=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 32)" > .env
+docker compose up -d
+```
+
+Then log in to Umami (`admin` / `umami`), change the password, add the site, and put its website ID in `reddit-clone/lib/analytics.js`. The tracker only reports from the domains listed there.
+
+The reverse proxy has to serve `/stats/script.js` and `/stats/api/send` on the site from Umami, and write a JSON access log that the `goaccess` service reads. With Caddy:
+
+```
+redditrebuilt.com {
+	log {
+		output file /var/log/caddy/redditrebuilt.log {
+			roll_size 50MiB
+			roll_keep_for 720h
+		}
+	}
+	@analytics path /stats/script.js /stats/api/send
+	handle @analytics {
+		uri strip_prefix /stats
+		reverse_proxy 127.0.0.1:3002
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3001
+	}
+}
+```
+
 ## Database layout
 
 | Table | Contents |

@@ -10,6 +10,7 @@ import HistoryChart from '@/components/HistoryChart';
 import { ShuffleIcon } from '@/components/Icons';
 import { CommunityCard, TopCommunitiesCard, SidebarFooter } from '@/components/Sidebar';
 import { addRecentCommunity } from '@/lib/hooks';
+import { track } from '@/lib/analytics';
 import { formatCount, monthLabel } from '@/lib/format';
 import { rangeFromQuery, rangeToQuery } from '@/lib/range';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
@@ -81,6 +82,11 @@ function CommunityPage({ name, info }) {
 
   useEffect(() => {
     if (info?.posts) addRecentCommunity(name);
+  }, [name, info]);
+
+  // Shows which communities people look for that the archive doesn't have
+  useEffect(() => {
+    if (!info) track('community-not-archived', { community: name });
   }, [name, info]);
 
   const setRange = (next) => {

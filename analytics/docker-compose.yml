@@ -1,0 +1,80 @@
+# Site analytics for Reddit Rebuilt, separate from the site's own stack.
+#   umami:   visitor dashboard (people only: it counts page views from a script
+#            in the page, so crawlers and API calls don't show up)
+#   traffic: GoAccess report built from Caddy's access log every 10 minutes,
+#            which does include crawlers, bandwidth and error responses
+# Caddy publishes both at stats.20250123.xyz (see README.md). Secrets live in .env.
+name: reddit-rebuilt-analytics
+
+services:
+  umami:
+    image: ghcr.io/umami-software/umami:3.4.1
+    container_name: umami
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3000"
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD}@umami-db:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET}
+      DISABLE_TELEMETRY: 1
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  umami-db:
+    image: postgres:17-alpine
+    container_name: umami-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD}
+    volumes:
+      - umami-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U umami -d umami"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # Rebuilds the report from every kept log file (Caddy keeps 30 days).
+  # IPs are anonymised (last block zeroed) in the report.
+  goaccess:
+    image: allinurl/goaccess:1.11
+    container_name: goaccess
+    restart: unless-stopped
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        while true; do
+          if ls /logs/redditrebuilt*.log* >/dev/null 2>&1; then
+            zcat -f /logs/redditrebuilt*.log* | goaccess - --log-format=CADDY --anonymize-ip \
+              --html-report-title='Reddit Rebuilt traffic' --no-progress -o /report/index.tmp.html \
+              && mv /report/index.tmp.html /report/index.html
+          fi
+          sleep 600
+        done
+    volumes:
+      - /var/log/caddy:/logs:ro
+      - traffic-report:/report
+    logging: *logging
+
+  traffic:
+    image: nginx:1.27-alpine
+    container_name: goaccess-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3004:80"
+    volumes:
+      - traffic-report:/usr/share/nginx/html:ro
+    logging: *logging
+
+volumes:
+  umami-db:
+  traffic-report:

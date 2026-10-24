@@ -1,10 +1,17 @@
+import { useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
 import { SITE_NAME } from '@/lib/site';
+import { track } from '@/lib/analytics';
 import styles from '@/styles/Feed.module.css';
 
 export default function NotFound() {
+  // Shows which missing pages people look for
+  useEffect(() => {
+    track('page-not-found', { path: window.location.pathname });
+  }, []);
+
   return (
     <Layout>
       <Head>

@@ -351,6 +351,25 @@ test.describe('Theme', () => {
 });
 
 // Checked in the server's HTML, before any script runs, as a crawler first sees it
+test.describe('Analytics', () => {
+  test('pages load the tracker, which only reports from the live site', async ({ request }) => {
+    const html = await (await request.get('/')).text();
+    const tag = /<script[^>]*src="\/stats\/script\.js"[^>]*>/.exec(html)?.[0];
+    expect(tag).toContain('data-website-id=');
+    expect(tag).toContain('data-domains="redditrebuilt.com"');
+  });
+
+  test('missing pages and communities work without the tracker', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('/no/such/page');
+    await expect(page.getByText("we couldn't find that page")).toBeVisible();
+    await page.goto('/r/NoSuchCommunityAtAll');
+    await expect(page.getByText('There are no archived posts for r/NoSuchCommunityAtAll')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+});
+
 test.describe('Search engine markup', () => {
   const canonical = (html) => /<link rel="canonical" href="([^"]+)"/.exec(html)?.[1];
   // The origin is SITE_URL as built; the path is what matters
