@@ -15,19 +15,29 @@ import { addRecentCommunity } from '@/lib/hooks';
 import { canGoBack } from '@/lib/navigation';
 import { decodeEntities, timeAgo, fullDate } from '@/lib/format';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
-import { threadStructuredData, jsonLd } from '@/lib/structuredData';
+import { threadStructuredData, commentStructuredData, jsonLd } from '@/lib/structuredData';
 import styles from '@/styles/Thread.module.css';
 
+const COMMENTS_WAIT_MS = 2000;
+
 export async function getServerSideProps({ params, res }) {
-  const { getPostById, ID_RE } = await import('@/lib/submissions');
+  const { getPostById, firstComments, ID_RE } = await import('@/lib/submissions');
   const id = String(params.id || '').toLowerCase();
   if (!ID_RE.test(id)) return { notFound: true };
 
   const post = await getPostById(id);
   if (!post) return { notFound: true };
 
+  // Comments for search engines' structured data; a slow lookup is left out
+  // rather than holding up the page, and keeps going to fill the cache for the
+  // comment section's own request
+  const comments = await Promise.race([
+    firstComments(post).catch(() => []),
+    new Promise((resolve) => setTimeout(resolve, COMMENTS_WAIT_MS, [])),
+  ]);
+
   res.setHeader('Cache-Control', 'public, s-maxage=86400');
-  return { props: { post } };
+  return { props: { post, comments: commentStructuredData(comments) } };
 }
 
 function useCommunityInfo(name) {
@@ -48,7 +58,7 @@ function useCommunityInfo(name) {
 
 const removedText = (text) => ['[deleted]', '[removed]'].includes(text);
 
-function PostDetail({ post }) {
+function PostDetail({ post, comments }) {
   const router = useRouter();
   const info = useCommunityInfo(post.subreddit);
   const title = decodeEntities(post.title);
@@ -87,7 +97,7 @@ function PostDetail({ post }) {
         <meta property="og:description" content={description} />
         <meta property="og:site_name" content={SITE_NAME} />
         {post.over_18 && <meta name="rating" content="adult" />}
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(threadStructuredData(post)) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(threadStructuredData(post, comments)) }} />
       </Head>
 
       <article className={styles.post}>

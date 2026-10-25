@@ -402,6 +402,17 @@ test.describe('Search engine markup', () => {
     // The title's "<" is escaped, so post text can't end the script element
     expect(json).not.toContain('<markdown>');
   });
+
+  test('threads carry their first comments, nested', async ({ request }) => {
+    const html = await (await request.get(`/Thread/${FIXTURE.topPost.id}`)).text();
+    const data = JSON.parse(/<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/s.exec(html)[1]);
+    const texts = (comments) => (comments || []).flatMap((c) => [c.text, ...texts(c.comment)]);
+    expect(texts(data.comment)).toEqual(expect.arrayContaining(['First top-level comment', 'Nested reply']));
+    const first = data.comment.find((c) => c.text === 'First top-level comment');
+    expect(first['@type']).toBe('Comment');
+    expect(first.comment.map((c) => c.text)).toContain('Reply from OP');
+    expect(texts(first.comment)).toContain('Nested reply');
+  });
 });
 
 test('unknown pages are a 404', async ({ page }) => {

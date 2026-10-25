@@ -497,6 +497,14 @@ export async function commentTablesForMonth(month) {
   return tablesInRange(tables, month, addMonths(month, 6));
 }
 
+// The first page of a thread's comments as its comment section loads them
+// (the same cache entry as /api/Comments with the default sort)
+export async function firstComments(post, limit = 20) {
+  const tables = await commentTablesForMonth(post.month);
+  if (tables.length === 0) return [];
+  return fetchCommentTree(tables, [`t3_${post.id}`], { depth: 4, limit, offset: 0, sort: 'top' });
+}
+
 async function fetchChildren(tables, parentIds) {
   if (parentIds.length === 0) return [];
   const branches = tables
