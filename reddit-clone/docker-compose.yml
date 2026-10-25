@@ -37,9 +37,13 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: Reddit-Rebuilt
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # The main data directory: a Docker volume unless POSTGRES_DATA names a
+      # directory (set it in .env to keep the database off the system disk)
+      - ${POSTGRES_DATA:-postgres_data}:/var/lib/postgresql/data
       # Bulk archive tablespace (newer months); point at whichever disk has room
       - ../pg_archive:/var/lib/postgresql/tablespaces/archive
+      # Optional fast tablespace (an SSD) for the archive's most-read indexes and months
+      - ${PG_FAST_DIR:-../pg_fast}:/var/lib/postgresql/tablespaces/fast
     networks:
       - reddit-net
     # LIMIT LOGGING HERE
@@ -48,18 +52,22 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    # The tablespace directory must exist and belong to postgres before startup
+    # The tablespace directories must exist and belong to postgres before startup
     entrypoint:
       - sh
       - -c
       - >-
-        mkdir -p /var/lib/postgresql/tablespaces/archive/data &&
-        chown postgres:postgres /var/lib/postgresql/tablespaces/archive/data &&
-        chmod 700 /var/lib/postgresql/tablespaces/archive/data &&
+        for ts in archive fast; do
+        mkdir -p /var/lib/postgresql/tablespaces/$$ts/data &&
+        chown postgres:postgres /var/lib/postgresql/tablespaces/$$ts/data &&
+        chmod 700 /var/lib/postgresql/tablespaces/$$ts/data || exit 1;
+        done;
         exec docker-entrypoint.sh "$$@"
       - sh
     # Quiet logs ("stop the screaming"); wal_level=minimal lets the loader make
-    # bulk-loaded tables durable without writing them to WAL twice
+    # bulk-loaded tables durable without writing them to WAL twice. A query over
+    # every month locks each month's table and indexes (~1000 locks), so the
+    # shared lock table is sized for many of those at once
     command: >-
       postgres
       -c log_statement=none -c log_min_error_statement=fatal
@@ -68,6 +76,7 @@ services:
       -c work_mem=32MB -c maintenance_work_mem=1GB
       -c max_wal_size=8GB -c checkpoint_timeout=15min
       -c random_page_cost=1.1 -c effective_io_concurrency=64
+      -c max_locks_per_transaction=1024
 
   loader:
     container_name: reddit-data-loader

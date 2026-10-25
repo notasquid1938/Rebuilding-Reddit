@@ -40,3 +40,8 @@ __pycache__/
 
 # All archive data (dumps, downloads, icons, subreddit snapshots); tracked scripts in Data/ stay tracked
 /Data/
+
+# Fast (SSD) tablespace when PG_FAST_DIR is unset
+/pg_fast/
+# Host-specific compose settings
+/reddit-clone/.env

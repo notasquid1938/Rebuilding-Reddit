@@ -87,8 +87,16 @@ Directories next to `reddit-clone/`:
 | --- | --- |
 | `Data/` | Downloaded `.zst` dumps, subreddit snapshots (`Data/subreddits/`), the gap-fill corpus (`Data/supplements/`) and icons (`Data/reddit/icons/`) |
 | `pg_archive/` | Postgres tablespace for loaded months. Point this volume at your largest disk in `docker-compose.yml` |
+| `pg_fast/` | Optional SSD tablespace (`fast_ssd`) for the most-read indexes |
 
-The Postgres data volume itself (Docker volume `postgres_data`) holds the small lookup tables and any months loaded before the tablespace existed.
+The Postgres data directory itself (Docker volume `postgres_data`) holds the site tables, the small lookup tables and any months loaded before the tablespace existed.
+
+To put these on other disks, set paths in `reddit-clone/.env` (not tracked):
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `POSTGRES_DATA` | `postgres_data` (Docker volume) | Postgres data directory |
+| `PG_FAST_DIR` | `../pg_fast` | Directory behind the `fast_ssd` tablespace |
 
 ### Configuration
 
