@@ -49,6 +49,8 @@ def test_staging_tables_swapped_out(db):
 def test_month_tables_are_logged_and_indexed(db, month):
     table = f'rs_{month}'
     assert one(db, 'SELECT relpersistence FROM pg_class WHERE relname = %s', (table,))[0] == 'p'
+    # Vacuumed by the load, so autovacuum has no reason to scan it later
+    assert one(db, 'SELECT relallvisible > 0 FROM pg_class WHERE relname = %s', (table,))[0]
     db.execute('SELECT indexname FROM pg_indexes WHERE tablename = %s ORDER BY 1', (table,))
     assert [r[0] for r in db.fetchall()] == [
         f'{table}_author_created_idx', f'{table}_id_idx', f'{table}_score_idx', f'{table}_sub_score_idx']

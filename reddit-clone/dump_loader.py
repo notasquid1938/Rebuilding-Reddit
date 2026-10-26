@@ -52,7 +52,7 @@ SPACE_PATH = os.getenv('LOADER_SPACE_PATH', DATA_DIR)
 SPACE_POLL_SECONDS = 60
 SAMPLE_LINES = 50000
 CHUNK_ROWS = 100000
-# Longest a month's indexing (SET LOGGED, indexes, ANALYZE) and lookup-row
+# Longest a month's indexing (SET LOGGED, indexes, VACUUM) and lookup-row
 # refresh are expected to take on a busy hard disk, so they don't start too
 # close to quiet hours
 REFRESH_MINUTES = 60
@@ -86,7 +86,7 @@ KINDS = {
                          'created_utc', 'distinguished', 'edited', 'stickied', 'author_flair_text',
                          'controversiality'],
         'peak_space': 5.0,
-        'index_minutes': 150,
+        'index_minutes': 180,
         'indexes': [
             ('parent_id_index', '(parent_id)'),
             ('link_id_index', '(link_id)'),
@@ -379,7 +379,9 @@ def _load_file(kind, filename):
             for suffix, cols in spec['indexes']:
                 cur.execute(sql.SQL('CREATE INDEX {} ON {} ' + cols + '{}').format(
                     sql.Identifier(f'{staging}_{suffix}'), sql.Identifier(staging), tablespace_clause()))
-            cur.execute(sql.SQL('ANALYZE {}').format(sql.Identifier(staging)))
+            # VACUUM too, so autovacuum doesn't make its own pass over the new
+            # month later (at any hour, quiet ones included)
+            cur.execute(sql.SQL('VACUUM (ANALYZE) {}').format(sql.Identifier(staging)))
         conn.autocommit = False
         print(f'[{table}] indexed in {(time.time() - indexing) / 60:.1f} min', flush=True)
 
