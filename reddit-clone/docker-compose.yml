@@ -115,6 +115,10 @@ services:
       # Check for newly published months daily
       - REFRESH_HOURS=24
       - ICON_RATE=20
+      # Local hours the loader stays off the disks, e.g. 23-8 (quiet_hours.py);
+      # set LOADER_QUIET_HOURS and LOADER_TZ in .env
+      - LOADER_QUIET_HOURS=${LOADER_QUIET_HOURS:-}
+      - TZ=${LOADER_TZ:-UTC}
     volumes:
       - ../Data:/data
     depends_on:

@@ -21,7 +21,7 @@ LOADER_SUBMISSIONS_WORKERS / LOADER_COMMENTS_WORKERS override it per kind),
 LOADER_COLUMNS (site = only what the website reads, default; all = every field),
 LOADER_TABLESPACE (optional Postgres tablespace for new tables),
 DELETE_LOADED_DUMPS (comma list of kinds whose .zst is deleted after a clean
-load, e.g. "comments"), LOADER_MIN_FREE_GB (optional: a month is only loaded
+load, e.g. "comments"), LOADER_QUIET_HOURS (quiet_hours.py), LOADER_MIN_FREE_GB (optional: a month is only loaded
 if the disk at LOADER_SPACE_PATH, default DATA_DIR, keeps this much free
 through the load; months that don't fit wait for a later run), plus the
 POSTGRES_* connection variables.
@@ -39,6 +39,8 @@ import time
 import psycopg2
 from psycopg2 import sql
 
+import quiet_hours
+
 DATA_DIR = os.getenv('DATA_DIR', os.getcwd())
 WORKERS = max(1, int(os.getenv('LOADER_WORKERS', '4')))
 COLUMN_MODE = os.getenv('LOADER_COLUMNS', 'site')
@@ -50,6 +52,10 @@ SPACE_PATH = os.getenv('LOADER_SPACE_PATH', DATA_DIR)
 SPACE_POLL_SECONDS = 60
 SAMPLE_LINES = 50000
 CHUNK_ROWS = 100000
+# Longest a month's indexing (SET LOGGED, indexes, ANALYZE) and lookup-row
+# refresh are expected to take on a busy hard disk, so they don't start too
+# close to quiet hours
+REFRESH_MINUTES = 60
 
 NUMERIC_COLUMNS = {'score', 'created_utc', 'ups', 'downs', 'controversiality'}
 
@@ -65,6 +71,7 @@ KINDS = {
         # Peak disk use while loading, per byte of .zst: SET LOGGED briefly
         # holds two copies of the table (measured ~2.9-3.5x for the final size)
         'peak_space': 5.0,
+        'index_minutes': 60,
         'indexes': [
             ('sub_score_idx', '(subreddit, score DESC)'),
             ('id_idx', '(id)'),
@@ -79,6 +86,7 @@ KINDS = {
                          'created_utc', 'distinguished', 'edited', 'stickied', 'author_flair_text',
                          'controversiality'],
         'peak_space': 5.0,
+        'index_minutes': 150,
         'indexes': [
             ('parent_id_index', '(parent_id)'),
             ('link_id_index', '(link_id)'),
@@ -344,6 +352,7 @@ def _load_file(kind, filename):
         for record in records():
             chunk.append(encode_row(record, columns, numeric_flags))
             if len(chunk) >= CHUNK_ROWS:
+                quiet_hours.wait(table)
                 bad = copy_chunk(conn, staging, columns, chunk)
                 failed += bad
                 loaded += len(chunk) - bad
@@ -361,6 +370,8 @@ def _load_file(kind, filename):
         failed += unparsable
 
         print(f'[{table}] {loaded:,} rows loaded, {failed:,} skipped; indexing', flush=True)
+        quiet_hours.wait(table, spec['index_minutes'])
+        indexing = time.time()
         conn.autocommit = True
         with conn.cursor() as cur:
             cur.execute("SET maintenance_work_mem = '1GB'")
@@ -370,6 +381,7 @@ def _load_file(kind, filename):
                     sql.Identifier(f'{staging}_{suffix}'), sql.Identifier(staging), tablespace_clause()))
             cur.execute(sql.SQL('ANALYZE {}').format(sql.Identifier(staging)))
         conn.autocommit = False
+        print(f'[{table}] indexed in {(time.time() - indexing) / 60:.1f} min', flush=True)
 
         # Swap in atomically and record completion
         with conn.cursor() as cur:
@@ -391,6 +403,7 @@ def _load_file(kind, filename):
         # Separate transaction: the swap's exclusive lock shouldn't be held
         # while the month is scanned for its id range, counts and top posts
         if kind == 'submissions':
+            quiet_hours.wait(table, REFRESH_MINUTES)
             with conn.cursor() as cur:
                 cur.execute('CALL refresh_month(%s)', (table,))
             conn.commit()

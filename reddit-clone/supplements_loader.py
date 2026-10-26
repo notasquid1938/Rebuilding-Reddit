@@ -24,7 +24,7 @@ Files already present under DATA_DIR/supplements/<source>/ are used instead of
 downloading them (scrape2013/Posts_YYYY-MM.json.tar.gz, archives/<item>/...).
 
 Usage: python3 supplements_loader.py [scrape2013|archives|all]   (default all)
-Environment: DATA_DIR, SUPPLEMENT_SCRAPE_MONTHS and
+Environment: DATA_DIR, LOADER_QUIET_HOURS (quiet_hours.py), SUPPLEMENT_SCRAPE_MONTHS and
 SUPPLEMENT_ARCHIVE_ITEMS (comma lists replacing the defaults), plus the
 POSTGRES_* variables.
 """
@@ -50,7 +50,9 @@ import numpy as np
 import requests
 from psycopg2 import sql
 
-from dump_loader import KINDS, connect, copy_chunk, encode_row, ensure_state_table, merge_extra, wait_for_db
+import quiet_hours
+from dump_loader import (KINDS, REFRESH_MINUTES, connect, copy_chunk, encode_row, ensure_state_table, merge_extra,
+                         wait_for_db)
 from gapfill_loader import EXTRA_COLUMNS, NUMERIC_FLAGS, ensure_extra_table, month_of
 
 DATA_DIR = os.getenv('DATA_DIR', os.getcwd())
@@ -63,6 +65,8 @@ if os.getenv('SUPPLEMENT_SCRAPE_MONTHS'):
     SCRAPE_MONTHS = [m.strip() for m in os.getenv('SUPPLEMENT_SCRAPE_MONTHS').split(',') if m.strip()]
 COLUMNS = KINDS['submissions']['site_columns']
 BATCH = 50000
+# Expected time to read one scrape month or archive item and look up its posts
+SOURCE_MINUTES = 30
 
 # Internet Archive items that hold posts the dumps don't have (checked October
 # 2026); one per community, preferring the copy with the archiver's CSV data
@@ -368,6 +372,7 @@ def merge_months(conn, months):
         table = f'rs_{month}'
         if table not in tables:
             continue  # stays in rs_extra; dump_loader merges it if the month is ever loaded
+        quiet_hours.wait('supplements', REFRESH_MINUTES)
         with conn.cursor() as cur:
             added = merge_extra(cur, table)
             if added:
@@ -476,6 +481,7 @@ def run(source):
             key = f'supplement/scrape2013/Posts_{month}.json.tar.gz'
             if key in done:
                 continue
+            quiet_hours.wait('supplements', SOURCE_MINUTES)
             stats = new_stats()
             add_posts(conn, archive, scrape_records(month), 'scrape2013', stats, seen)
             merged = merge_months(conn, stats['by_month'])
@@ -490,6 +496,7 @@ def run(source):
             key = f'supplement/archive/{item}'
             if key in done:
                 continue
+            quiet_hours.wait('supplements', SOURCE_MINUTES)
             stats = new_stats()
             workdir = tempfile.mkdtemp(prefix='supplement-', dir=LOCAL_DIR if os.path.isdir(LOCAL_DIR) else None)
             try:

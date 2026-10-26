@@ -57,7 +57,12 @@ subreddits_and_icons() {
   python3 -u /app/scrape_icons.py
 }
 
+# Waits out LOADER_QUIET_HOURS, or until after them if the next step (expected
+# to take $1 minutes) wouldn't finish first (quiet_hours.py)
+quiet() { python3 -u /app/quiet_hours.py "$1" "$2"; }
+
 run_cycle() {
+  quiet 0 cycle
   echo "=== $(date -u) archive refresh ==="
 
   # Icons for communities already in the archive don't need to wait for the load
@@ -81,6 +86,7 @@ run_cycle() {
 
   # After the monthly dumps, so it only adds what they don't have
   if [ -n "$gapfill_pid" ] && wait "$gapfill_pid"; then
+    quiet 0 gapfill
     python3 -u /app/gapfill_loader.py load
   fi
   # Posts from the 2013 scrape and community archives (supplements_loader.py)
@@ -88,12 +94,15 @@ run_cycle() {
     python3 -u /app/supplements_loader.py
   fi
 
+  quiet 60 "site tables"
   echo "--- Refreshing site lookup tables ---"
   "${PSQL[@]}" -f /app/scripts/site_tables.sql -f /app/scripts/build_subreddit_metadata.sql
   # One-off index of the months each author posted in (user pages); a no-op
   # once built, and refresh_month keeps it current. Before the comments, which
   # would otherwise compete for the archive disk.
-  "${PSQL[@]}" -c "CALL build_author_months(${LOADER_TABLESPACE:+'$LOADER_TABLESPACE'})"
+  # It runs for hours inside Postgres, so it waits out quiet hours itself
+  "${PSQL[@]}" -c "SET loader.quiet_hours = '${LOADER_QUIET_HOURS:-}'" -c "SET loader.timezone = '${TZ:-UTC}'" \
+    -c "CALL build_author_months(${LOADER_TABLESPACE:+'$LOADER_TABLESPACE'})"
 
   # Comments last: they take days, and nothing above depends on them
   if [ "${LOAD_COMMENTS:-0}" = "1" ]; then

@@ -20,6 +20,7 @@ import subprocess
 import sys
 import urllib.request
 
+import quiet_hours
 from dump_loader import connect
 
 DATA_DIR = os.getenv('DATA_DIR', os.getcwd())
@@ -182,6 +183,8 @@ def main():
 
     failures = 0
     for infohash, wanted in plan.items():
+        # Downloads write to the archive disk; give one a couple of hours before quiet hours
+        quiet_hours.wait('fetch', 120)
         try:
             got = download(infohash, wanted)
             for name in sorted(wanted - got):

@@ -205,6 +205,44 @@ def test_author_months_build_runs_once(db):
     assert one(db, "SELECT count(*) FROM site_builds WHERE name = 'author_months'")[0] == 1
 
 
+def test_in_quiet_hours(db):
+    def quiet(setting, timezone, moment):
+        db.execute("SELECT set_config('loader.quiet_hours', %s, false), set_config('loader.timezone', %s, false)",
+                   (setting, timezone))
+        return one(db, 'SELECT in_quiet_hours(%s::timestamptz)', (moment,))[0]
+    try:
+        assert quiet('23-8', 'UTC', '2026-10-25 23:00+00')
+        assert quiet('23-8', 'UTC', '2026-10-25 07:59+00')
+        assert not quiet('23-8', 'UTC', '2026-10-25 08:00+00')
+        assert not quiet('23-8', 'UTC', '2026-10-25 22:59+00')
+        # The hours are local to loader.timezone: 04:00 UTC is 23:00 in Chicago
+        assert quiet('23-8', 'America/Chicago', '2026-10-26 04:00+00')
+        assert not quiet('23-8', 'America/Chicago', '2026-10-25 23:00+00')
+        assert quiet('9-17', 'UTC', '2026-10-25 12:00+00')
+        assert not quiet('9-17', 'UTC', '2026-10-25 17:00+00')
+        assert not quiet('', 'UTC', '2026-10-25 23:00+00')
+        assert not quiet('8-8', 'UTC', '2026-10-25 08:00+00')
+    finally:
+        db.execute("RESET loader.quiet_hours; RESET loader.timezone")
+
+
+def test_author_months_build_waits_out_quiet_hours(db):
+    import psycopg2
+    db.execute("DELETE FROM site_builds WHERE name = 'author_months'")
+    # Quiet from this hour to the next: the build sets up, then waits
+    hour = one(db, "SELECT extract(hour FROM now() AT TIME ZONE 'UTC')::int")[0]
+    db.execute("SET loader.quiet_hours = %s; SET loader.timezone = 'UTC'; SET statement_timeout = '3s'",
+               (f'{hour}-{(hour + 1) % 24}',))
+    try:
+        with pytest.raises(psycopg2.errors.QueryCanceled):
+            db.execute('CALL build_author_months()')
+    finally:
+        db.execute('RESET statement_timeout; RESET loader.quiet_hours; RESET loader.timezone')
+    assert one(db, 'SELECT count(*) FROM author_months_staged')[0] == 0
+    db.execute('CALL build_author_months()')
+    assert author_months(db) == authors_by_month(db)
+
+
 def test_refresh_month_adds_new_authors(db):
     db.execute("DELETE FROM author_months WHERE author IN (SELECT author FROM rs_2006_01)")
     db.execute("CALL refresh_author_months('rs_2006_01')")

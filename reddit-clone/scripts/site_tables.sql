@@ -252,6 +252,47 @@ END $$;
 -- cheap. Whatever refresh_month added meanwhile is kept. Every step commits,
 -- so an interrupted build continues where it stopped. Run in its own session:
 --   CALL build_author_months('archive_hdd');
+-- Quiet hours for work that runs long inside Postgres (LOADER_QUIET_HOURS,
+-- quiet_hours.py), from the session settings loader.quiet_hours ("23-8") and
+-- loader.timezone. Called between steps, after a COMMIT: it sleeps while the
+-- local hour is inside them, or would be within `minutes_needed`.
+CREATE OR REPLACE FUNCTION in_quiet_hours(at timestamptz) RETURNS boolean
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+  hours text := coalesce(current_setting('loader.quiet_hours', true), '');
+  tz text := coalesce(nullif(current_setting('loader.timezone', true), ''), current_setting('TimeZone'));
+  q_start integer;
+  q_end integer;
+  h integer;
+BEGIN
+  IF hours !~ '^\d{1,2}-\d{1,2}$' THEN
+    RETURN false;
+  END IF;
+  q_start := split_part(hours, '-', 1)::integer;
+  q_end := split_part(hours, '-', 2)::integer;
+  h := extract(hour FROM at AT TIME ZONE tz);
+  RETURN CASE WHEN q_start = q_end THEN false
+              WHEN q_start < q_end THEN h >= q_start AND h < q_end
+              ELSE h >= q_start OR h < q_end END;
+END $$;
+
+CREATE OR REPLACE FUNCTION wait_for_work_hours(minutes_needed integer DEFAULT 0) RETURNS void
+LANGUAGE plpgsql AS $$
+DECLARE
+  waited boolean := false;
+BEGIN
+  -- Checked every minute up to the end of the work, so a quiet period that
+  -- begins partway through is caught
+  WHILE EXISTS (SELECT 1 FROM generate_series(0, minutes_needed) m
+                 WHERE in_quiet_hours(clock_timestamp() + make_interval(mins => m))) LOOP
+    IF NOT waited THEN
+      RAISE NOTICE '% quiet hours: waiting', clock_timestamp();
+      waited := true;
+    END IF;
+    PERFORM pg_sleep(60);
+  END LOOP;
+END $$;
+
 CREATE OR REPLACE PROCEDURE build_author_months(work_tablespace text DEFAULT NULL)
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -294,6 +335,7 @@ BEGIN
          AND NOT EXISTS (SELECT 1 FROM author_months_staged s WHERE s.table_name = c.relname)
        ORDER BY c.relname LIMIT 1;
       EXIT WHEN tbl IS NULL;
+      PERFORM wait_for_work_hours(30);
       RAISE NOTICE '% staging %', clock_timestamp(), tbl;
       IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = tbl::regclass AND attname = 'author' AND NOT attisdropped) THEN
         EXECUTE format('INSERT INTO author_months_stage SELECT DISTINCT author, %s FROM %I WHERE is_account(author)',
@@ -312,12 +354,14 @@ BEGIN
     SELECT c.relname INTO part FROM pg_inherits i JOIN pg_class c ON c.oid = i.inhrelid
      WHERE i.inhparent = to_regclass('author_months_stage') ORDER BY c.relname LIMIT 1;
     EXIT WHEN part IS NULL;
+    PERFORM wait_for_work_hours(30);
     RAISE NOTICE '% grouping %', clock_timestamp(), part;
     EXECUTE format('INSERT INTO author_months_new
                     SELECT author, array_agg(month ORDER BY month) FROM %I GROUP BY author', part);
     EXECUTE format('DROP TABLE %I', part);
     COMMIT;
   END LOOP;
+  PERFORM wait_for_work_hours(60);
   RAISE NOTICE '% indexing', clock_timestamp();
   IF to_regclass('author_months_new_pkey') IS NULL THEN
     ALTER TABLE author_months_new ADD CONSTRAINT author_months_new_pkey PRIMARY KEY (author);

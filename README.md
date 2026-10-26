@@ -97,6 +97,8 @@ To put these on other disks, set paths in `reddit-clone/.env` (not tracked):
 | --- | --- | --- |
 | `POSTGRES_DATA` | `postgres_data` (Docker volume) | Postgres data directory |
 | `PG_FAST_DIR` | `../pg_fast` | Directory behind the `fast_ssd` tablespace |
+| `LOADER_QUIET_HOURS` | (none) | Local hours the loader leaves the disks alone, e.g. `23-8`. Loads pause between chunks, and long steps (indexing a month, refreshing its lookup rows, building `author_months`) only start if they can finish first. The website keeps serving |
+| `LOADER_TZ` | `UTC` | Time zone of `LOADER_QUIET_HOURS`, e.g. `America/Chicago` |
 
 ### Configuration
 
