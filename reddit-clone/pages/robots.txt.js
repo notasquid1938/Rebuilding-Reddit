@@ -1,6 +1,23 @@
 import { sitemapBatches, indexPageCount } from '@/lib/sitemap';
 import { SITE_URL } from '@/lib/site';
 
+// A crawler follows only the group naming it, so each named group repeats
+// what it may fetch
+const RULES = [
+  // Anthropic's crawler fetched ~7 pages a second from the archive disk
+  'User-agent: ClaudeBot',
+  'Crawl-delay: 5',
+  'Allow: /',
+  '',
+  // SEO-tool crawler: no benefit to the site
+  'User-agent: AhrefsBot',
+  'Disallow: /',
+  '',
+  'User-agent: *',
+  'Allow: /',
+  '',
+];
+
 // Lists every page of the sitemap index (see lib/sitemap.js)
 function Robots() {
   // getServerSideProps writes the response
@@ -16,7 +33,7 @@ export async function getServerSideProps({ res }) {
   const sitemaps = Array.from({ length: pages }, (_, i) => `Sitemap: ${SITE_URL}/sitemap.xml${i ? `?page=${i + 1}` : ''}`);
   res.setHeader('Content-Type', 'text/plain');
   res.setHeader('Cache-Control', 'public, max-age=86400');
-  res.write(['# Allow all crawlers', 'User-agent: *', 'Allow: /', ...sitemaps, ''].join('\n'));
+  res.write([...RULES, ...sitemaps, ''].join('\n'));
   res.end();
   return { props: {} };
 }

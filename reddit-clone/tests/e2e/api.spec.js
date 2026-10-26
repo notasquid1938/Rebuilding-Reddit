@@ -318,4 +318,11 @@ test.describe('Sitemaps', () => {
     expect(text).toMatch(/^Sitemap: http:\/\/127\.0\.0\.1:\d+\/sitemap\.xml$/m);
     expect(text).not.toContain('page=2');
   });
+
+  test('robots.txt slows ClaudeBot and turns away AhrefsBot', async ({ request }) => {
+    const text = await (await request.get('/robots.txt')).text();
+    expect(text).toMatch(/User-agent: ClaudeBot\nCrawl-delay: 5\nAllow: \//);
+    expect(text).toMatch(/User-agent: AhrefsBot\nDisallow: \//);
+    expect(text).toMatch(/User-agent: \*\nAllow: \//);
+  });
 });
