@@ -159,18 +159,21 @@ export const UserCard = ({ name }) => {
     <SidebarCard>
       <h2 className={styles.cardHeading}>u/{name}</h2>
       {stats ? (
-        <>
-          <div className={styles.stats}>
-            <Stat value={formatCount(stats.karma)} label="Post karma" />
-            <Stat value={formatCount(stats.posts)} label="Archived posts" />
-          </div>
-          {stats.firstPost && (
+        stats.lastPost ? (
+          <>
             <div className={styles.stats}>
               <Stat value={fullDate(stats.firstPost).split(',').slice(0, 2).join(',')} label="First post" />
               <Stat value={fullDate(stats.lastPost).split(',').slice(0, 2).join(',')} label="Latest post" />
             </div>
-          )}
-        </>
+            {stats.activeMonths !== null && (
+              <div className={styles.stats}>
+                <Stat value={formatCount(stats.activeMonths)} label="Months with posts" />
+              </div>
+            )}
+          </>
+        ) : (
+          <p className={styles.text}>No archived posts.</p>
+        )
       ) : failed ? (
         <p className={styles.text}>Stats aren&apos;t available for this account.</p>
       ) : (

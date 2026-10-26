@@ -269,9 +269,9 @@ async function authorMonths(author) {
 }
 
 // The monthly tables to search for an author's posts
-async function authorTables(author) {
+async function authorTables(author, months) {
   const tables = (await getSubmissionTables()).filter((t) => t.columns.has('author'));
-  const months = await authorMonths(author);
+  if (months === undefined) months = await authorMonths(author);
   return months ? tables.filter((t) => months.has(t.month)) : tables;
 }
 
@@ -720,26 +720,38 @@ export function getUserStats(author) {
   return queryCache.cached(`user:${author}`, 6 * HOUR, () => loadUserStats(author));
 }
 
+// A user's first and latest post dates and, once author_months is built, how
+// many months they posted in. Totals such as post count or karma would read
+// every post from the archive disk, so they are left out.
 async function loadUserStats(author) {
-  const tables = await authorTables(author);
-  if (tables.length === 0) return { name: author, posts: 0, karma: 0, firstPost: null, lastPost: null };
-  const branches = tables.map((t) => `SELECT score, created_utc FROM "${t.name}" WHERE author = $1`);
-  const { rows } = await timedQuery(
-    `SELECT COUNT(*) AS posts, COALESCE(SUM(score), 0) AS karma,
-            MIN(created_utc) AS first_post, MAX(created_utc) AS last_post
-       FROM (${branches.join(' UNION ALL ')}) AS posts`,
-    [author],
-    20000,
-    { wide: branches.length > WIDE_TABLES }
-  );
-  const row = rows[0];
+  const months = await authorMonths(author);
+  const tables = await authorTables(author, months);
+  const lastPost = await edgePostDate(tables, author, 'max');
   return {
     name: author,
-    posts: Number(row.posts),
-    karma: Number(row.karma),
-    firstPost: row.first_post ? Number(row.first_post) : null,
-    lastPost: row.last_post ? Number(row.last_post) : null,
+    firstPost: lastPost === null ? null : await edgePostDate(tables, author, 'min'),
+    lastPost,
+    activeMonths: months ? months.size : null,
   };
+}
+
+const DATE_SEARCH_MONTHS = 12;
+
+// The latest ('max') or first ('min') post date among `tables`, searching a
+// year of months at a time from that end and stopping at the first with a
+// post. Each month answers from its (author, created_utc) index, which reads
+// at most one post per month that has some.
+async function edgePostDate(tables, author, fn) {
+  const ordered = [...tables].sort((a, b) => a.month.localeCompare(b.month));
+  if (fn === 'max') ordered.reverse();
+  for (let i = 0; i < ordered.length; i += DATE_SEARCH_MONTHS) {
+    const branches = ordered
+      .slice(i, i + DATE_SEARCH_MONTHS)
+      .map((t) => `SELECT ${fn}(created_utc) AS at FROM "${t.name}" WHERE author = $1`);
+    const { rows } = await timedQuery(`SELECT ${fn}(at) AS at FROM (${branches.join(' UNION ALL ')}) AS months`, [author]);
+    if (rows[0].at !== null) return Number(rows[0].at);
+  }
+  return null;
 }
 
 // A random thread: from the front page, one of a month's top posts (top_posts,

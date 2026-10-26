@@ -222,8 +222,10 @@ test.describe('User', () => {
   test('lists posts newest first with stats', async ({ page }) => {
     await page.goto('/User/alice');
     expect((await feedTitles(page))[0]).toBe(FIXTURE.laterPost.title);
-    await expect(page.getByText('9.9K')).toBeVisible();
-    await expect(page.getByText('Archived posts')).toBeVisible();
+    await expect(page.getByText('First post')).toBeVisible();
+    await expect(page.getByText('Dec 10, 2005')).toBeVisible();
+    await expect(page.getByText('Months with posts')).toBeVisible();
+    await expect(page.getByText('Post karma')).toHaveCount(0);
   });
 
   test('top sort', async ({ page }) => {

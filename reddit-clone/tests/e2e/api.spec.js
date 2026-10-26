@@ -257,8 +257,18 @@ test.describe('Random', () => {
 });
 
 test.describe('User', () => {
-  test('totals posts and karma', async ({ request }) => {
-    expect(await get(request, '/api/User?name=alice')).toMatchObject({ posts: 4, karma: 5000 + 4000 + 777 + 100 });
+  test('gives first and latest post dates and months with posts', async ({ request }) => {
+    const stats = await get(request, '/api/User?name=alice');
+    expect(stats).toEqual({
+      name: 'alice',
+      firstPost: Date.UTC(2005, 11, 10) / 1000,
+      lastPost: Date.UTC(2010, 5, 15) / 1000,
+      activeMonths: 4,
+    });
+  });
+
+  test('has no dates for an account without posts', async ({ request }) => {
+    expect(await get(request, '/api/User?name=nobody_here')).toMatchObject({ firstPost: null, lastPost: null });
   });
 });
 
