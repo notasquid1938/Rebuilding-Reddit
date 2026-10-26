@@ -380,8 +380,10 @@ def _load_file(kind, filename):
                 cur.execute(sql.SQL('CREATE INDEX {} ON {} ' + cols + '{}').format(
                     sql.Identifier(f'{staging}_{suffix}'), sql.Identifier(staging), tablespace_clause()))
             # VACUUM too, so autovacuum doesn't make its own pass over the new
-            # month later (at any hour, quiet ones included)
-            cur.execute(sql.SQL('VACUUM (ANALYZE) {}').format(sql.Identifier(staging)))
+            # month later (at any hour, quiet ones included). Not in parallel:
+            # parallel VACUUM keeps maintenance_work_mem in shared memory,
+            # which /dev/shm (shm_size) is too small for
+            cur.execute(sql.SQL('VACUUM (ANALYZE, PARALLEL 0) {}').format(sql.Identifier(staging)))
         conn.autocommit = False
         print(f'[{table}] indexed in {(time.time() - indexing) / 60:.1f} min', flush=True)
 
