@@ -3,7 +3,7 @@ import PostCard, { PostSkeleton } from './PostCard';
 import { SORT_LABELS } from '@/lib/sorts';
 import styles from '@/styles/Feed.module.css';
 
-const PAGE_SIZE = 15;
+export const PAGE_SIZE = 15;
 
 // Feeds survive client-side navigation so "back" from a thread restores the
 // list (and, with scrollRestoration, the scroll position) without refetching.
@@ -19,10 +19,21 @@ function buildUrl({ startDate, endDate, subreddit, author, sort }, page) {
   return `/api/Posts?${params}`;
 }
 
+// The state a feed starts in: from the cache, the page's server-rendered first
+// page (`initial`, see firstFeedPage), or empty until the first fetch
+function startState(cacheKey, initial) {
+  if (feedCache.has(cacheKey)) return feedCache.get(cacheKey);
+  if (initial) {
+    const { posts, truncated } = initial;
+    return { posts, page: 1, done: truncated || posts.length < PAGE_SIZE, truncated };
+  }
+  return { posts: [], page: 0, done: false, truncated: false };
+}
+
 // Remount with a different `key` whenever the query changes.
-const Feed = ({ query, context = 'feed', emptyMessage = 'No posts found for this period.' }) => {
+const Feed = ({ query, initial = null, context = 'feed', emptyMessage = 'No posts found for this period.' }) => {
   const cacheKey = JSON.stringify(query);
-  const [state, setState] = useState(() => feedCache.get(cacheKey) || { posts: [], page: 0, done: false, truncated: false });
+  const [state, setState] = useState(() => startState(cacheKey, initial));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const sentinelRef = useRef(null);

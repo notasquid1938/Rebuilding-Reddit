@@ -319,6 +319,39 @@ test.describe('Random post', () => {
   });
 });
 
+test.describe('Server-rendered feeds', () => {
+  // Crawlers that don't run scripts still see the posts
+  const htmlTitles = async (request, url) => {
+    const html = await (await request.get(url)).text();
+    return [...html.matchAll(/<a href="\/Thread\/\w+">([^<]+)<\/a><\/h3>/g)].map((m) => m[1]);
+  };
+
+  test('community pages include their first page of posts in the URL sort', async ({ request }) => {
+    const top = await htmlTitles(request, '/r/programming');
+    expect(top[0]).toBe('January winner');
+    expect(top).toHaveLength(15);
+    expect((await htmlTitles(request, '/r/programming?sort=comments'))[0]).toBe('What is &lt;markdown&gt;?');
+  });
+
+  test('profiles include their first page of posts in the URL sort', async ({ request }) => {
+    expect(await htmlTitles(request, '/User/alice')).toEqual([
+      FIXTURE.laterPost.title,
+      'February programming post',
+      'January winner',
+      'Top &amp; best post of December',
+    ]);
+    expect((await htmlTitles(request, '/User/alice?sort=top'))[0]).toBe('Top &amp; best post of December');
+  });
+
+  test('the browser does not fetch the server-rendered page again', async ({ page }) => {
+    const firstPages = [];
+    page.on('request', (r) => r.url().includes('/api/Posts') && r.url().includes('page=1&') && firstPages.push(r.url()));
+    await page.goto('/r/programming');
+    expect((await feedTitles(page))[0]).toBe('January winner');
+    expect(firstPages).toEqual([]);
+  });
+});
+
 test.describe('Community history', () => {
   test('chart shows posts per month and a bar opens that month', async ({ page }) => {
     await page.goto('/r/programming');

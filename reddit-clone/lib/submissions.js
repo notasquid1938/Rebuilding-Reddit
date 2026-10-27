@@ -448,6 +448,20 @@ async function loadPosts({ startDate, endDate, subreddit, author, sort, limit, o
   return rows.map(normalizePost);
 }
 
+const FIRST_PAGE_WAIT_MS = 2000;
+
+// The first page of a feed for a page's server render, so crawlers see posts
+// without running the page's scripts. null if it takes longer than the wait:
+// the browser then fetches it as before, and the query keeps going to fill
+// the cache for that request.
+export async function firstFeedPage(query, limit) {
+  const posts = await Promise.race([
+    queryPosts({ ...query, limit, offset: 0 }).catch(() => null),
+    new Promise((resolve) => setTimeout(resolve, FIRST_PAGE_WAIT_MS, null)),
+  ]);
+  return posts && { key: JSON.stringify(query), posts: [...posts], truncated: Boolean(posts.truncated) };
+}
+
 // Reddit ids are sequential base-36 numbers, so post_id_ranges narrows a
 // lookup to the month(s) whose id range contains it.
 async function tablesForId(tables, id) {

@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
-import Feed from '@/components/Feed';
+import Feed, { PAGE_SIZE } from '@/components/Feed';
 import FeedControls from '@/components/FeedControls';
 import UserAvatar from '@/components/UserAvatar';
 import { UserCard, SidebarFooter } from '@/components/Sidebar';
@@ -12,18 +12,24 @@ import styles from '@/styles/Profile.module.css';
 
 const AUTHOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
-// Rendered on the server so the title and canonical link are in the HTML
-export async function getServerSideProps({ res }) {
+const feedQueryFor = (name, query) => ({ author: name, sort: sortFromQuery(query, 'new', USER_SORTS) });
+
+// Rendered on the server so the title, canonical link and first page of posts
+// are in the HTML
+export async function getServerSideProps({ params, query, res }) {
+  const { firstFeedPage } = await import('@/lib/submissions');
+  const name = params.name;
+  const firstPage = AUTHOR_RE.test(name) ? await firstFeedPage(feedQueryFor(name, query), PAGE_SIZE) : null;
   res.setHeader('Cache-Control', 'public, s-maxage=3600');
-  return { props: {} };
+  return { props: { firstPage } };
 }
 
-function UserPage() {
+function UserPage({ firstPage }) {
   const router = useRouter();
   const { name } = router.query;
   const sort = sortFromQuery(router.query, 'new', USER_SORTS);
   const valid = typeof name === 'string' && AUTHOR_RE.test(name);
-  const feedQuery = { author: name, sort };
+  const feedQuery = feedQueryFor(name, router.query);
 
   const setSort = (next) => {
     router.push({ pathname: '/User/[name]', query: withSort({ name }, next, 'new') }, undefined, { shallow: true });
@@ -65,6 +71,7 @@ function UserPage() {
           <Feed
             key={JSON.stringify(feedQuery)}
             query={feedQuery}
+            initial={firstPage?.key === JSON.stringify(feedQuery) ? firstPage : null}
             context="user"
             emptyMessage={`u/${name} has no archived posts.`}
           />
