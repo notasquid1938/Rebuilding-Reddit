@@ -503,12 +503,67 @@ function addMonths(month, count) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+// A thread whose post no dump has but whose comments were archived: its id,
+// month and community, read from one of the comments. null if no comment
+// mentions it either.
+export function getMissingPost(id) {
+  return queryCache.cached(`missing:${id}`, (post) => (post ? 24 * HOUR : 10 * 60 * 1000), () => loadMissingPost(id));
+}
+
+async function loadMissingPost(id) {
+  const month = await monthOfId(id);
+  if (!month) return null;
+  const tables = (await commentTablesForMonth(month)).filter((t) => t.columns.has('link_id'));
+  if (tables.length === 0) return null;
+  // Months in order: the first comment found ends the search
+  const branches = tables.map(
+    (t) => `(SELECT ${t.columns.has('subreddit') ? '"subreddit"::text' : 'NULL::text'} AS subreddit
+               FROM "${t.name}" WHERE link_id = $1 LIMIT 1)`
+  );
+  const { rows } = await timedQuery(`${branches.join(' UNION ALL ')} LIMIT 1`, [`t3_${id}`], 10000);
+  if (!rows[0]) return null;
+  return { id, month, subreddit: nullish(rows[0].subreddit) ? null : rows[0].subreddit, missing: true };
+}
+
+// The month an id was handed out in. A few posts carry ids far from their
+// month's, which widens that month's range, so the narrowest range holding
+// the id is the right one.
+async function monthOfId(id) {
+  if (!(await hasTable('post_id_ranges'))) return null;
+  const value = parseInt(id, 36);
+  if (!Number.isSafeInteger(value)) return null;
+  const db = await connectToDatabase();
+  const { rows } = await db.query(
+    `SELECT to_char(month, 'YYYY-MM') AS month FROM post_id_ranges
+      WHERE $1::bigint BETWEEN id_min AND id_max ORDER BY id_max - id_min LIMIT 1`,
+    [value]
+  );
+  return rows[0]?.month || null;
+}
+
+// Comments recovered from other archives (wayback_threads.py), which can
+// belong to any month
+async function getExtraCommentTable() {
+  const cached = tableCache.rc_extra;
+  if (cached && Date.now() - cached.time < TABLE_CACHE_MS) return cached.table;
+  const db = await connectToDatabase();
+  const { rows } = await db.query(
+    `SELECT array_agg(a.attname::text) AS columns FROM pg_attribute a
+      WHERE a.attrelid = to_regclass('public.rc_extra') AND a.attnum > 0 AND NOT a.attisdropped`
+  );
+  const table = rows[0]?.columns ? { name: 'rc_extra', month: null, columns: new Set(rows[0].columns) } : null;
+  tableCache.rc_extra = { time: Date.now(), table };
+  return table;
+}
+
 // Reddit archives threads after six months, so a post's comments live in its
-// own month's table or one of the following six.
+// own month's table or one of the following six, plus any recovered ones.
+// Months whose comments aren't loaded yet stay without tables.
 export async function commentTablesForMonth(month) {
-  const tables = await getCommentTables();
-  if (!isMonth(month)) return tables;
-  return tablesInRange(tables, month, addMonths(month, 6));
+  const all = await getCommentTables();
+  const tables = isMonth(month) ? tablesInRange(all, month, addMonths(month, 6)) : all;
+  const extra = tables.length ? await getExtraCommentTable() : null;
+  return extra ? [...tables, extra] : tables;
 }
 
 // The first page of a thread's comments as its comment section loads them

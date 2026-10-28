@@ -166,6 +166,12 @@ test.describe('Comments', () => {
     expect(comments.map((c) => c.id)).toEqual(['k004', 'k005']);
   });
 
+  test('serves comments on a post no archive has', async ({ request }) => {
+    const { comments } = await get(request, '/api/Comments?id=c0zz&month=2006-01');
+    expect(comments.map((c) => c.id)).toEqual(['m101']);
+    expect(comments[0].replies.map((c) => c.id)).toEqual(['m102', 'm105']);
+  });
+
   test('reports months without comment dumps', async ({ request }) => {
     expect(await get(request, '/api/Comments?id=e001&month=2010-06')).toEqual({ available: false, comments: [] });
   });

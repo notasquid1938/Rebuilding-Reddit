@@ -147,6 +147,21 @@ test.describe('Thread', () => {
     await expect(page.getByText(/· locked/)).toBeVisible();
   });
 
+  test('shows the comments of a post no archive has', async ({ page }) => {
+    const response = await page.goto(`/Thread/${FIXTURE.missingPost.id}`);
+    expect(response.status()).toBe(200);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText("This post wasn't archived");
+    await expect(page.locator('article').getByRole('link', { name: 'r/programming' })).toBeVisible();
+    await expect(page.locator('article')).toContainText('Jan 2006');
+    const comments = page.getByRole('region', { name: 'Comments' });
+    await expect(comments.getByText('Comment on a post no archive has')).toBeVisible();
+    await expect(comments.getByText('Reply under the missing post')).toBeVisible();
+    // From rc_extra: recovered comments sit with the archived ones
+    await expect(comments.getByText('Recovered reply from a saved page')).toBeVisible();
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+    await expect(page).toHaveTitle('Unarchived post : r/programming');
+  });
+
   test('unknown posts are a 404', async ({ page }) => {
     const response = await page.goto('/Thread/zzzzzz');
     expect(response.status()).toBe(404);

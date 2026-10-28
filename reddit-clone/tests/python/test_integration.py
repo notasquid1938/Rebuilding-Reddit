@@ -33,7 +33,7 @@ def test_every_month_loaded_with_expected_counts(db):
     db.execute("SELECT file, rows_loaded, rows_failed FROM loader_state WHERE file LIKE 'R%' ORDER BY file")
     assert db.fetchall() == [
         ('RC_2005-12.zst', 5, 0),
-        ('RC_2006-01.zst', 1, 0),
+        ('RC_2006-01.zst', 3, 0),
         ('RS_2005-12.zst', 45, 2),  # the two malformed lines are counted, not loaded
         ('RS_2006-01.zst', 32, 0),
         ('RS_2006-02.zst', 11, 0),

@@ -104,6 +104,11 @@ COMMENTS = {
     # Comments arrive in later months' dumps too
     '2006-01': [
         comment('m001', 't3_b001', 'Late comment from January', 'erin', 30, ts(2006, 1, 2)),
+        # On a post no dump has (c0zz lies inside January's id range)
+        comment('m101', 't3_c0zz', 'Comment on a post no archive has', 'kate', 7, ts(2006, 1, 8),
+                link_id='t3_c0zz', subreddit='programming'),
+        comment('m102', 't1_m101', 'Reply under the missing post', 'liam', 3, ts(2006, 1, 8, 1),
+                link_id='t3_c0zz', subreddit='programming'),
     ],
 }
 

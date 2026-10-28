@@ -13,7 +13,7 @@ import { CommunityCard, SidebarFooter } from '@/components/Sidebar';
 import { BackIcon } from '@/components/Icons';
 import { addRecentCommunity } from '@/lib/hooks';
 import { canGoBack } from '@/lib/navigation';
-import { decodeEntities, timeAgo, fullDate } from '@/lib/format';
+import { decodeEntities, timeAgo, fullDate, monthLabel } from '@/lib/format';
 import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { threadStructuredData, commentStructuredData, jsonLd } from '@/lib/structuredData';
 import styles from '@/styles/Thread.module.css';
@@ -21,12 +21,18 @@ import styles from '@/styles/Thread.module.css';
 const COMMENTS_WAIT_MS = 2000;
 
 export async function getServerSideProps({ params, res }) {
-  const { getPostById, firstComments, ID_RE } = await import('@/lib/submissions');
+  const { getPostById, getMissingPost, firstComments, ID_RE } = await import('@/lib/submissions');
   const id = String(params.id || '').toLowerCase();
   if (!ID_RE.test(id)) return { notFound: true };
 
   const post = await getPostById(id);
-  if (!post) return { notFound: true };
+  if (!post) {
+    // No archive has the post, but its comments may have survived
+    const missing = await getMissingPost(id);
+    if (!missing) return { notFound: true };
+    res.setHeader('Cache-Control', 'public, s-maxage=86400');
+    return { props: { post: missing, comments: [] } };
+  }
 
   // Comments for search engines' structured data; a slow lookup is left out
   // rather than holding up the page, and keeps going to fill the cache for the
@@ -58,8 +64,89 @@ function useCommunityInfo(name) {
 
 const removedText = (text) => ['[deleted]', '[removed]'].includes(text);
 
-function PostDetail({ post, comments }) {
+function useBack(subreddit) {
   const router = useRouter();
+  return () => {
+    if (canGoBack()) router.back();
+    else router.push(subreddit ? `/r/${subreddit}` : '/');
+  };
+}
+
+// A thread whose post isn't in any archive, shown for the comments that were
+function MissingPostDetail({ post }) {
+  const info = useCommunityInfo(post.subreddit);
+  const goBack = useBack(post.subreddit);
+  const community = post.subreddit ? `r/${post.subreddit}` : 'Reddit';
+
+  return (
+    <Layout
+      sidebar={
+        post.subreddit && (
+          <>
+            <CommunityCard name={post.subreddit} info={info} showLink />
+            <SidebarFooter />
+          </>
+        )
+      }
+    >
+      <Head>
+        <title>{`Unarchived post : ${community}`}</title>
+        <meta name="description" content={`Comments on a ${community} post from ${monthLabel(post.month)} that wasn't archived`} />
+        <meta name="robots" content="noindex" />
+        <link rel="canonical" href={`${SITE_URL}/Thread/${post.id}`} />
+      </Head>
+
+      <article className={styles.post}>
+        <div className={styles.metaRow}>
+          <button type="button" className={styles.backButton} onClick={goBack} aria-label="Go back">
+            <BackIcon size={16} />
+          </button>
+          {post.subreddit && (
+            <Link href={`/r/${post.subreddit}`} aria-hidden="true" tabIndex={-1}>
+              <SubredditIcon name={post.subreddit} size={32} />
+            </Link>
+          )}
+          <div className={styles.metaText}>
+            <div className={styles.metaTop}>
+              {post.subreddit ? (
+                <Link href={`/r/${post.subreddit}`} className={styles.community}>
+                  r/{post.subreddit}
+                </Link>
+              ) : (
+                <span className={styles.community}>Unknown community</span>
+              )}
+              <span className={styles.dot}>•</span>
+              <span>{monthLabel(post.month)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.titleRow}>
+          <div className={styles.titleBlock}>
+            <h1 className={styles.title}>This post wasn&apos;t archived</h1>
+          </div>
+        </div>
+        <p className={styles.removed}>
+          None of the archives this site is built from has the post itself, but comments on it were saved. They&apos;re
+          shown below.
+        </p>
+
+        <div className={styles.actions}>
+          <ShareButton path={`/Thread/${post.id}`} />
+        </div>
+      </article>
+
+      <CommentSection post={post} />
+    </Layout>
+  );
+}
+
+function PostDetail({ post, comments }) {
+  if (post.missing) return <MissingPostDetail post={post} />;
+  return <ArchivedPostDetail post={post} comments={comments} />;
+}
+
+function ArchivedPostDetail({ post, comments }) {
   const info = useCommunityInfo(post.subreddit);
   const title = decodeEntities(post.title);
   const hasBody = post.is_self && post.selftext && !removedText(post.selftext);
@@ -68,10 +155,7 @@ function PostDetail({ post, comments }) {
     if (post.subreddit) addRecentCommunity(post.subreddit);
   }, [post.subreddit]);
 
-  const goBack = () => {
-    if (canGoBack()) router.back();
-    else router.push(post.subreddit ? `/r/${post.subreddit}` : '/');
-  };
+  const goBack = useBack(post.subreddit);
 
   const description = hasBody
     ? decodeEntities(post.selftext).replace(/\s+/g, ' ').slice(0, 160)

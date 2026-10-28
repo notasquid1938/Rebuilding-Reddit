@@ -51,7 +51,6 @@ STATE_KEY = f'gapfill/{FILENAME}'
 URL = os.getenv('GAPFILL_URL', 'https://archive.org/download/FullRedditSubmissionCorpus2006ThruAugust2015/'
                 + FILENAME)
 SHA256 = os.getenv('GAPFILL_SHA256', '91a3547555288ab53649d2115a3850b956bcc99bf3ab2fefeda18c590cc8b276')
-# Banned for sexualising minors or sharing non-consensual images
 # The corpus ends in August 2015; check against a little more than that
 LAST_MONTH = '2015_12'
 COLUMNS = KINDS['submissions']['site_columns']
