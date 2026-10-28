@@ -341,4 +341,10 @@ test.describe('Sitemaps', () => {
     expect(text).toMatch(/User-agent: AhrefsBot\nDisallow: \//);
     expect(text).toMatch(/User-agent: \*\nAllow: \//);
   });
+
+  test('robots.txt keeps crawlers away from the analytics beacon', async ({ request }) => {
+    const text = await (await request.get('/robots.txt')).text();
+    expect(text).toMatch(/User-agent: ClaudeBot\nCrawl-delay: 5\nAllow: \/\nDisallow: \/stats\/\n/);
+    expect(text).toMatch(/User-agent: \*\nAllow: \/\nDisallow: \/stats\/\n/);
+  });
 });

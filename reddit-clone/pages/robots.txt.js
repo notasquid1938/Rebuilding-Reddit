@@ -2,12 +2,15 @@ import { sitemapBatches, indexPageCount } from '@/lib/sitemap';
 import { SITE_URL } from '@/lib/site';
 
 // A crawler follows only the group naming it, so each named group repeats
-// what it may fetch
+// what it may fetch. /stats/ is the visitor-analytics script and beacon:
+// Googlebot ran it on every page it rendered, spending crawl budget on
+// beacons Umami drops anyway
 const RULES = [
   // Anthropic's crawler fetched ~7 pages a second from the archive disk
   'User-agent: ClaudeBot',
   'Crawl-delay: 5',
   'Allow: /',
+  'Disallow: /stats/',
   '',
   // SEO-tool crawler: no benefit to the site
   'User-agent: AhrefsBot',
@@ -15,6 +18,7 @@ const RULES = [
   '',
   'User-agent: *',
   'Allow: /',
+  'Disallow: /stats/',
   '',
 ];
 
