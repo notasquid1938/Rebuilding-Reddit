@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Markdown from './Markdown';
 import UserAvatar from './UserAvatar';
@@ -8,7 +8,7 @@ import { timeAgo, fullDate, formatCount } from '@/lib/format';
 import { COMMENT_SORTS, SORT_LABELS } from '@/lib/sorts';
 import styles from '@/styles/Comments.module.css';
 
-const PAGE_SIZE = 20;
+export const PAGE_SIZE = 20;
 
 const Comment = ({ comment, month, postId, opAuthor, sort, depth = 0 }) => {
   const [collapsed, setCollapsed] = useState(false);
@@ -121,15 +121,22 @@ const Comment = ({ comment, month, postId, opAuthor, sort, depth = 0 }) => {
   );
 };
 
-const CommentSection = ({ post }) => {
-  const [comments, setComments] = useState([]);
+// `initial`: the first page in the default sort, from the page's server
+// render ({ available, comments } as /api/Comments returns it), or null to
+// fetch it here
+const CommentSection = ({ post, initial = null }) => {
+  const [comments, setComments] = useState(() => initial?.comments || []);
   const [sort, setSort] = useState('top');
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState('loading'); // loading | ready | unavailable | error
-  const [hasMore, setHasMore] = useState(false);
+  // loading | ready | unavailable | error
+  const [status, setStatus] = useState(() => (initial ? (initial.available ? 'ready' : 'unavailable') : 'loading'));
+  const [hasMore, setHasMore] = useState(() => initial?.comments.length === PAGE_SIZE);
   const [loadingMore, setLoadingMore] = useState(false);
+  const served = useRef(Boolean(initial));
 
   useEffect(() => {
+    if (served.current && page === 1 && sort === 'top') return;
+    served.current = false;
     let active = true;
     const load = async () => {
       if (page === 1) setStatus('loading');

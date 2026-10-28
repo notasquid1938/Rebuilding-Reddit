@@ -8,7 +8,7 @@ import Markdown from '@/components/Markdown';
 import PostMedia, { LinkThumbnail, LinkDomain } from '@/components/PostMedia';
 import { PostTags } from '@/components/PostCard';
 import { VoteButtons, CommentsButton, ShareButton, SaveButton } from '@/components/PostActions';
-import CommentSection from '@/components/Comments';
+import CommentSection, { PAGE_SIZE as COMMENTS_PAGE_SIZE } from '@/components/Comments';
 import { CommunityCard, SidebarFooter } from '@/components/Sidebar';
 import { BackIcon } from '@/components/Icons';
 import { addRecentCommunity } from '@/lib/hooks';
@@ -25,25 +25,21 @@ export async function getServerSideProps({ params, res }) {
   const id = String(params.id || '').toLowerCase();
   if (!ID_RE.test(id)) return { notFound: true };
 
-  const post = await getPostById(id);
-  if (!post) {
-    // No archive has the post, but its comments may have survived
-    const missing = await getMissingPost(id);
-    if (!missing) return { notFound: true };
-    res.setHeader('Cache-Control', 'public, s-maxage=86400');
-    return { props: { post: missing, comments: [] } };
-  }
+  // No archive may have the post, but its comments may have survived
+  const post = (await getPostById(id)) || (await getMissingPost(id));
+  if (!post) return { notFound: true };
 
-  // Comments for search engines' structured data; a slow lookup is left out
-  // rather than holding up the page, and keeps going to fill the cache for the
-  // comment section's own request
-  const comments = await Promise.race([
-    firstComments(post).catch(() => []),
-    new Promise((resolve) => setTimeout(resolve, COMMENTS_WAIT_MS, [])),
+  // The first page of comments, in the HTML for crawlers and the structured
+  // data, and the comment section's starting point. A slow lookup is left to
+  // the browser rather than holding up the page, and keeps going to fill the
+  // cache for the comment section's own request
+  const firstPage = await Promise.race([
+    firstComments(post, COMMENTS_PAGE_SIZE).catch(() => null),
+    new Promise((resolve) => setTimeout(resolve, COMMENTS_WAIT_MS, null)),
   ]);
 
   res.setHeader('Cache-Control', 'public, s-maxage=86400');
-  return { props: { post, comments: commentStructuredData(comments) } };
+  return { props: { post, firstPage, comments: commentStructuredData(firstPage?.comments) } };
 }
 
 function useCommunityInfo(name) {
@@ -73,7 +69,7 @@ function useBack(subreddit) {
 }
 
 // A thread whose post isn't in any archive, shown for the comments that were
-function MissingPostDetail({ post }) {
+function MissingPostDetail({ post, firstPage }) {
   const info = useCommunityInfo(post.subreddit);
   const goBack = useBack(post.subreddit);
   const community = post.subreddit ? `r/${post.subreddit}` : 'Reddit';
@@ -136,17 +132,17 @@ function MissingPostDetail({ post }) {
         </div>
       </article>
 
-      <CommentSection post={post} />
+      <CommentSection post={post} initial={firstPage} />
     </Layout>
   );
 }
 
-function PostDetail({ post, comments }) {
-  if (post.missing) return <MissingPostDetail post={post} />;
-  return <ArchivedPostDetail post={post} comments={comments} />;
+function PostDetail({ post, firstPage, comments }) {
+  if (post.missing) return <MissingPostDetail post={post} firstPage={firstPage} />;
+  return <ArchivedPostDetail post={post} firstPage={firstPage} comments={comments} />;
 }
 
-function ArchivedPostDetail({ post, comments }) {
+function ArchivedPostDetail({ post, firstPage, comments }) {
   const info = useCommunityInfo(post.subreddit);
   const title = decodeEntities(post.title);
   const hasBody = post.is_self && post.selftext && !removedText(post.selftext);
@@ -246,7 +242,7 @@ function ArchivedPostDetail({ post, comments }) {
         </div>
       </article>
 
-      <CommentSection post={post} />
+      <CommentSection post={post} initial={firstPage} />
     </Layout>
   );
 }

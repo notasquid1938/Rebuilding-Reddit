@@ -367,6 +367,40 @@ test.describe('Server-rendered feeds', () => {
   });
 });
 
+test.describe('Server-rendered comments', () => {
+  // Crawlers that don't run scripts still see the comments
+  const html = async (request, url) => (await request.get(url)).text();
+
+  test('threads include their first page of comments, nested', async ({ request }) => {
+    const page = await html(request, `/Thread/${FIXTURE.topPost.id}`);
+    expect(page).toMatch(/id="t1_\w+"/);
+    expect(page).toContain('<p>First top-level comment</p>');
+    expect(page).toContain('<p>Nested reply</p>');
+  });
+
+  test('so do posts no archive has', async ({ request }) => {
+    expect(await html(request, `/Thread/${FIXTURE.missingPost.id}`)).toContain('<p>Comment on a post no archive has</p>');
+  });
+
+  test('threads whose comments are not loaded say so', async ({ request }) => {
+    expect(await html(request, `/Thread/${FIXTURE.laterPost.id}`)).toMatch(/Comments aren(&#x27;|')t archived yet/);
+  });
+
+  test('the browser fetches comments only for another sort', async ({ page }) => {
+    const fetched = [];
+    page.on('request', (r) => r.url().includes('/api/Comments') && fetched.push(new URL(r.url()).searchParams.get('sort')));
+    await page.goto(`/Thread/${FIXTURE.topPost.id}`);
+    const comments = page.getByRole('region', { name: 'Comments' });
+    await expect(comments.getByText('First top-level comment')).toBeVisible();
+    expect(fetched).toEqual([]);
+    await comments.getByRole('combobox').selectOption('new');
+    await expect(comments.locator('[id^="t1_"]').first()).toContainText('Late comment from January');
+    await comments.getByRole('combobox').selectOption('top');
+    await expect(comments.locator('[id^="t1_"]').first()).toContainText('First top-level comment');
+    expect(fetched).toEqual(['new', 'top']);
+  });
+});
+
 test.describe('Community history', () => {
   test('chart shows posts per month and a bar opens that month', async ({ page }) => {
     await page.goto('/r/programming');
