@@ -5,13 +5,14 @@ import { SITE_URL } from '@/lib/site';
 // what it may fetch. /stats/ is the visitor-analytics script and beacon:
 // Googlebot ran it on every page it rendered, spending crawl budget on
 // beacons Umami drops anyway
+
+// Crawlers slowed to a page every 5 seconds: each fetched several pages a
+// second from the archive disk (ClaudeBot ~7; PerplexityBot 3 on Oct 30,
+// mostly profiles, alongside Applebot), slowing the site for everyone
+const SLOWED = ['ClaudeBot', 'PerplexityBot', 'Applebot'];
+
 const RULES = [
-  // Anthropic's crawler fetched ~7 pages a second from the archive disk
-  'User-agent: ClaudeBot',
-  'Crawl-delay: 5',
-  'Allow: /',
-  'Disallow: /stats/',
-  '',
+  ...SLOWED.flatMap((agent) => [`User-agent: ${agent}`, 'Crawl-delay: 5', 'Allow: /', 'Disallow: /stats/', '']),
   // SEO-tool crawler: no benefit to the site
   'User-agent: AhrefsBot',
   'Disallow: /',
