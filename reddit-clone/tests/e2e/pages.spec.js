@@ -162,6 +162,18 @@ test.describe('Thread', () => {
     await expect(page).toHaveTitle('Unarchived post : r/programming');
   });
 
+  test('links in archived text go where Reddit sent them', async ({ page }) => {
+    await page.goto(`/Thread/${FIXTURE.missingPost.id}`);
+    const comment = page.locator('#t1_m105');
+    // A path with no host meant Reddit; on this site it would be a 404
+    await expect(comment.getByRole('link', { name: 'the wiki' })).toHaveAttribute('href', 'https://www.reddit.com/r/korea/wiki');
+    // `[](/SB50)` drew a CSS icon on Reddit; here it's nothing
+    await expect(comment.locator('a[href*="SB50"]')).toHaveCount(0);
+    // A relative link would resolve against this page, so it's plain text
+    await expect(comment.getByText('the picture')).toBeVisible();
+    await expect(comment.getByRole('link', { name: 'the picture' })).toHaveCount(0);
+  });
+
   test('unknown posts are a 404', async ({ page }) => {
     const response = await page.goto('/Thread/zzzzzz');
     expect(response.status()).toBe(404);

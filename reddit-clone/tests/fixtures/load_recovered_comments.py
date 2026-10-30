@@ -1,7 +1,8 @@
 """
 Puts one comment in rc_extra, as wayback_threads.py would, before the website
 tests: a reply only a saved page had, under the fixture thread c0zz whose post
-no dump has. Usage: python3 tests/fixtures/load_recovered_comments.py
+no dump has. Its links are written the way Reddit's own text wrote them
+(paths with no host, a CSS icon trick, a relative link). Usage: python3 tests/fixtures/load_recovered_comments.py
 """
 import os
 import sys
@@ -12,7 +13,8 @@ import wayback_threads as w  # noqa: E402
 from dump_loader import connect, copy_chunk, encode_row  # noqa: E402
 
 COMMENT = {'month': '2006-01-01', 'id': 'm105', 'parent_id': 't1_m101', 'link_id': 't3_c0zz', 'author': 'olga',
-           'body': 'Recovered reply from a saved page', 'subreddit': 'programming', 'score': 1,
+           'body': 'Recovered reply from a saved page, see [the wiki](/r/korea/wiki)[](/SB50) and [the picture](pics/cetme.jpg)',
+           'subreddit': 'programming', 'score': 1,
            'created_utc': 1136700000, 'controversiality': 0}
 
 conn = connect()
