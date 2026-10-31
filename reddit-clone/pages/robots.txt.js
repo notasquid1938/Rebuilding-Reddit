@@ -6,17 +6,18 @@ import { SITE_URL } from '@/lib/site';
 // Googlebot ran it on every page it rendered, spending crawl budget on
 // beacons Umami drops anyway
 
-// Crawlers slowed to a page every 5 seconds: each fetched several pages a
-// second from the archive disk (ClaudeBot ~7; PerplexityBot 3 on Oct 30,
-// mostly profiles, alongside Applebot), slowing the site for everyone
-const SLOWED = ['ClaudeBot', 'PerplexityBot', 'Applebot'];
+// Crawler slowed to a page every 5 seconds: it fetched ~7 pages a second
+// from the archive disk, slowing the site for everyone
+const SLOWED = ['ClaudeBot'];
+
+// Crawlers turned away. AhrefsBot is an SEO tool. PerplexityBot and Applebot
+// ignored Crawl-delay at ~3 pages a second each (Oct 30-31), keeping the
+// archive disk busy enough to crowd out Googlebot, and sent no visitors
+const BLOCKED = ['AhrefsBot', 'PerplexityBot', 'Applebot'];
 
 const RULES = [
   ...SLOWED.flatMap((agent) => [`User-agent: ${agent}`, 'Crawl-delay: 5', 'Allow: /', 'Disallow: /stats/', '']),
-  // SEO-tool crawler: no benefit to the site
-  'User-agent: AhrefsBot',
-  'Disallow: /',
-  '',
+  ...BLOCKED.flatMap((agent) => [`User-agent: ${agent}`, 'Disallow: /', '']),
   'User-agent: *',
   'Allow: /',
   'Disallow: /stats/',

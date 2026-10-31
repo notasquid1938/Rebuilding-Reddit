@@ -335,12 +335,12 @@ test.describe('Sitemaps', () => {
     expect(text).not.toContain('page=2');
   });
 
-  test('robots.txt slows ClaudeBot, PerplexityBot and Applebot and turns away AhrefsBot', async ({ request }) => {
+  test('robots.txt slows ClaudeBot and turns away AhrefsBot, PerplexityBot and Applebot', async ({ request }) => {
     const text = await (await request.get('/robots.txt')).text();
-    for (const agent of ['ClaudeBot', 'PerplexityBot', 'Applebot']) {
-      expect(text).toMatch(new RegExp(`User-agent: ${agent}\\nCrawl-delay: 5\\nAllow: /\\nDisallow: /stats/\\n`));
+    expect(text).toMatch(/User-agent: ClaudeBot\nCrawl-delay: 5\nAllow: \/\nDisallow: \/stats\/\n/);
+    for (const agent of ['AhrefsBot', 'PerplexityBot', 'Applebot']) {
+      expect(text).toMatch(new RegExp(`User-agent: ${agent}\\nDisallow: /\\n\\n`));
     }
-    expect(text).toMatch(/User-agent: AhrefsBot\nDisallow: \//);
     expect(text).toMatch(/User-agent: \*\nAllow: \//);
   });
 
