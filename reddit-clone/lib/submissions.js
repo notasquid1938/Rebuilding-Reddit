@@ -88,7 +88,9 @@ const COMMENT_ORDER = {
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 export const isMonth = (value) => typeof value === 'string' && MONTH_RE.test(value);
-export const SUBREDDIT_RE = /^[A-Za-z0-9_.]{1,64}$/;
+// Community names, plus the profile communities Reddit gives each user
+// (u_<username>), which keep any dashes in the username
+export const SUBREDDIT_RE = /^(?:[A-Za-z0-9_.]{1,64}|u_[A-Za-z0-9_-]{1,64})$/;
 export const AUTHOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
 export const ID_RE = /^[a-z0-9]{1,16}$/i;
 

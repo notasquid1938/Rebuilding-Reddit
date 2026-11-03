@@ -525,6 +525,11 @@ test.describe('Search engine markup', () => {
   });
 });
 
+test("users' profile communities open even with a dash in the name", async ({ request }) => {
+  expect((await request.get('/r/u_some-user')).status()).toBe(200);
+  expect((await request.get('/r/some-community')).status()).toBe(404);
+});
+
 test('unknown pages are a 404', async ({ page }) => {
   const response = await page.goto('/does-not-exist');
   expect(response.status()).toBe(404);

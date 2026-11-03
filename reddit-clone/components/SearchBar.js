@@ -17,7 +17,7 @@ const SearchBar = () => {
   // Debounced suggestion lookup
   useEffect(() => {
     const trimmed = query.trim().replace(/^\/?r\//i, '');
-    if (!trimmed || !/^[A-Za-z0-9_.]+$/.test(trimmed)) {
+    if (!trimmed || !/^(?:u_[A-Za-z0-9_-]+|[A-Za-z0-9_.]+)$/.test(trimmed)) {
       setSuggestions([]);
       return;
     }

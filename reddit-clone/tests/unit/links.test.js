@@ -7,6 +7,7 @@ describe('linkTarget', () => {
     expect(linkTarget('/r/pics/comments/abc12/')).toEqual({ local: '/Thread/abc12' });
     expect(linkTarget('https://old.reddit.com/r/pics/')).toEqual({ local: '/r/pics' });
     expect(linkTarget('/r/pics')).toEqual({ local: '/r/pics' });
+    expect(linkTarget('/r/u_Far-Glass/')).toEqual({ local: '/r/u_Far-Glass' });
     expect(linkTarget('/u/spez')).toEqual({ local: '/User/spez' });
     expect(linkTarget('https://reddit.com/user/spez/')).toEqual({ local: '/User/spez' });
   });

@@ -7,7 +7,7 @@ function localHref(href) {
   if (!path.startsWith('/')) return null;
   let m = /^\/r\/[^/]+\/comments\/([a-z0-9]+)/i.exec(path);
   if (m) return `/Thread/${m[1].toLowerCase()}`;
-  m = /^\/r\/([A-Za-z0-9_.]+)\/?$/.exec(path);
+  m = /^\/r\/(u_[A-Za-z0-9_-]+|[A-Za-z0-9_.]+)\/?$/.exec(path);
   if (m) return `/r/${m[1]}`;
   m = /^\/u(?:ser)?\/([A-Za-z0-9_-]+)\/?$/.exec(path);
   if (m) return `/User/${m[1]}`;
