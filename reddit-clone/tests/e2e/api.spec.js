@@ -344,6 +344,13 @@ test.describe('Sitemaps', () => {
     expect(text).toMatch(/User-agent: \*\nAllow: \//);
   });
 
+  test('serves the IndexNow key as plain text', async ({ request }) => {
+    const res = await request.get('/indexnow.txt');
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('text/plain');
+    expect(await res.text()).toBe('test-indexnow-key');
+  });
+
   test('robots.txt keeps crawlers away from the analytics beacon', async ({ request }) => {
     const text = await (await request.get('/robots.txt')).text();
     expect(text).toMatch(/User-agent: ClaudeBot\nCrawl-delay: 5\nAllow: \/\nDisallow: \/stats\/\n/);

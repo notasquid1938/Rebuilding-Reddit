@@ -483,6 +483,20 @@ test.describe('Search engine markup', () => {
     }
   });
 
+  test('every page type has a description search engines will show', async ({ request }) => {
+    const entities = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'" };
+    const description = (html) =>
+      /<meta name="description" content="([^"]*)"/.exec(html)?.[1].replace(/&(amp|lt|gt|quot|#x27);/g, (e) => entities[e]);
+    const pages = ['/', '/r/programming', '/User/alice', `/Thread/${FIXTURE.selfPost.id}`, `/Thread/${FIXTURE.topPost.id}`];
+    for (const url of pages) {
+      const text = description(await (await request.get(url)).text());
+      expect(text?.length, url).toBeGreaterThanOrEqual(70);
+      expect(text.length, url).toBeLessThanOrEqual(160);
+    }
+    const thread = description(await (await request.get(`/Thread/${FIXTURE.topPost.id}`)).text());
+    expect(thread).toContain('Posted in r/reddit.com by u/alice');
+  });
+
   test('threads carry DiscussionForumPosting data', async ({ request }) => {
     const html = await (await request.get(`/Thread/${FIXTURE.selfPost.id}`)).text();
     const json = /<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/s.exec(html)?.[1];

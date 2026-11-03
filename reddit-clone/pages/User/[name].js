@@ -39,7 +39,12 @@ function UserPage({ firstPage }) {
     <Layout sidebar={valid && <><UserCard name={name} /><SidebarFooter /></>}>
       <Head>
         <title>{name ? `u/${name} - ${SITE_NAME}` : SITE_NAME}</title>
-        {name && <meta name="description" content={`Archive of posts by u/${name}`} />}
+        {name && (
+          <meta
+            name="description"
+            content={`Posts by u/${name} archived from Reddit's history, newest or top first, with their scores, comments and communities, on ${SITE_NAME}.`}
+          />
+        )}
         {valid && <link rel="canonical" href={`${SITE_URL}/User/${name}`} />}
       </Head>
 

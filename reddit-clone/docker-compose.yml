@@ -14,6 +14,8 @@ services:
       - NODE_ENV=production
       - DATA_DIR=/Data
       - SITE_URL=https://redditrebuilt.com
+      # IndexNow key from .env (see indexnow.py)
+      - INDEXNOW_KEY=${INDEXNOW_KEY:-}
     volumes:
       - ../Data:/Data:ro 
     depends_on:

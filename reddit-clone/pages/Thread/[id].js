@@ -153,9 +153,11 @@ function ArchivedPostDetail({ post, firstPage, comments }) {
 
   const goBack = useBack(post.subreddit);
 
-  const description = hasBody
-    ? decodeEntities(post.selftext).replace(/\s+/g, ' ').slice(0, 160)
-    : `Posted in r/${post.subreddit} by u/${post.author} on ${fullDate(post.created_utc)}`;
+  // Search engines show 70-160 characters, so a short body is followed by where it was posted
+  const body = hasBody ? decodeEntities(post.selftext).replace(/\s+/g, ' ').trim() : '';
+  const commentCount = post.num_comments === 1 ? '1 comment' : `${post.num_comments || 0} comments`;
+  const posted = `Posted in r/${post.subreddit} by u/${post.author} on ${fullDate(post.created_utc)}, with ${commentCount}, archived on ${SITE_NAME}`;
+  const description = (body.length >= 70 ? body : [body, posted].filter(Boolean).join(' · ')).slice(0, 160);
 
   return (
     <Layout

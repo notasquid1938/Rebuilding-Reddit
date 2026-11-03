@@ -70,7 +70,7 @@ rm -rf .next/standalone/.next/static .next/standalone/public
 cp -r .next/static .next/standalone/.next/static
 cp -r public .next/standalone/public
 POSTGRES_URL="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB" \
-  PORT="$APP_PORT" HOSTNAME=127.0.0.1 NODE_ENV=production DISABLE_RATE_LIMIT=1 SITE_URL="http://127.0.0.1:$APP_PORT" \
+  PORT="$APP_PORT" HOSTNAME=127.0.0.1 NODE_ENV=production DISABLE_RATE_LIMIT=1 SITE_URL="http://127.0.0.1:$APP_PORT" INDEXNOW_KEY=test-indexnow-key \
   node .next/standalone/server.js > "$WORK/app.log" 2>&1 &
 APP_PID=$!
 for _ in $(seq 60); do curl -sf "http://127.0.0.1:$APP_PORT/api/AvailableDates" > /dev/null && break; sleep 1; done
