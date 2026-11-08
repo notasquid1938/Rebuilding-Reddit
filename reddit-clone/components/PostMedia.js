@@ -144,8 +144,10 @@ const EmbedMedia = ({ media, title, thumb }) => {
   );
 };
 
-// Reddit-hosted video (v.redd.it). Its HLS stream carries the sound: Safari
-// plays it natively, other browsers through hls.js, loaded on the first play
+// Reddit-hosted video (v.redd.it). Its HLS stream carries the sound: played
+// through hls.js (loaded on the first play) wherever the browser has Media
+// Source Extensions, since Chrome's own HLS support claims the stream and then
+// fails on it; natively only where there's no MSE (older iPhones)
 const RedditVideo = ({ id, thumb, href }) => {
   const [playing, setPlaying] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -160,17 +162,17 @@ const RedditVideo = ({ id, thumb, href }) => {
       if (source) video.src = source;
       video.play().catch(() => {});
     };
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      start(playlist);
-      return undefined;
-    }
+    const native = video.canPlayType('application/vnd.apple.mpegurl');
     let hls = null;
     let cancelled = false;
     import('hls.js')
       .then(({ default: Hls }) => {
         if (cancelled) return;
-        // No Media Source Extensions: the MP4 Reddit kept without sound
-        if (!Hls.isSupported()) return start(`${base}/DASH_480.mp4`);
+        if (!Hls.isSupported()) {
+          // No MSE: the native player, or the MP4 Reddit kept without sound
+          start(native ? playlist : `${base}/DASH_480.mp4`);
+          return;
+        }
         hls = new Hls();
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (!data.fatal) return;
@@ -182,7 +184,7 @@ const RedditVideo = ({ id, thumb, href }) => {
         hls.attachMedia(video);
         start();
       })
-      .catch(() => setFailed(true));
+      .catch(() => (native ? start(playlist) : setFailed(true)));
     return () => {
       cancelled = true;
       hls?.destroy();

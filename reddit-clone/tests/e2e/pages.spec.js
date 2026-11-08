@@ -527,11 +527,18 @@ test.describe('Embedded media', () => {
   });
 
   test('a Reddit video that is gone says so', async ({ page }) => {
-    await page.route('https://v.redd.it/**', (route) => route.fulfill({ status: 403, body: '' }));
+    const fetchedBy = [];
+    await page.route('https://v.redd.it/**', (route) => {
+      fetchedBy.push(route.request().resourceType());
+      return route.fulfill({ status: 403, body: '' });
+    });
     await feedOf(page, [card('zz1', 'A video', 'https://v.redd.it/gonevideo1')]);
     await page.goto('/');
     await page.getByRole('button', { name: 'Play video' }).click();
     await expect(page.getByText('Video no longer available')).toBeVisible();
+    // Through hls.js, not Chrome's own HLS player, which fails on Reddit's streams
+    expect(fetchedBy).not.toContain('media');
+    expect(fetchedBy.length).toBeGreaterThan(0);
     await expect(page.getByRole('link', { name: 'Original link' })).toHaveAttribute('href', 'https://v.redd.it/gonevideo1');
   });
 });
