@@ -466,6 +466,76 @@ test.describe('Analytics', () => {
   });
 });
 
+test.describe('Embedded media', () => {
+  const card = (id, title, url, extra = {}) => ({
+    id, title, url, subreddit: 'pics', author: 'alice', domain: new URL(url).hostname,
+    score: 1, num_comments: 0, created_utc: 1134000000, is_self: false, ...extra,
+  });
+  const feedOf = (page, posts) => page.route('**/api/Posts?*', (route) => route.fulfill({ json: posts }));
+  // Players stay offline: their pages are replaced with empty documents
+  const stubPlayers = (page) =>
+    page.route(/^https:\/\/(www\.redgifs\.com|clips\.twitch\.tv|open\.spotify\.com)\//, (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>player</title>' })
+    );
+
+  test('NSFW media can be shown unblurred for the session; spoilers still wait', async ({ page }) => {
+    await stubPlayers(page);
+    await feedOf(page, [
+      card('zz1', 'NSFW clip', 'https://www.redgifs.com/watch/FixtureClip', { over_18: true }),
+      card('zz2', 'NSFW spoiler clip', 'https://www.redgifs.com/watch/OtherClip', { over_18: true, spoiler: true }),
+    ]);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(2);
+    await expect(page.getByRole('button', { name: 'Play video' })).toHaveCount(0);
+
+    const toggle = page.getByRole('button', { name: 'Show NSFW media without blur for this session' });
+    await toggle.click();
+    await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'View spoiler' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Play video' })).toHaveCount(1);
+
+    // The rest of the session, across reloads
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Play video' })).toHaveCount(1);
+    await page.getByRole('button', { name: 'Blur NSFW media again' }).click();
+    await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(2);
+  });
+
+  test('a RedGIFs clip plays in place', async ({ page }) => {
+    await stubPlayers(page);
+    await feedOf(page, [card('zz1', 'A clip', 'https://www.redgifs.com/watch/FixtureClip')]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Play video' }).click();
+    await expect(page.locator('iframe[title="A clip"]')).toHaveAttribute('src', 'https://www.redgifs.com/ifr/fixtureclip');
+  });
+
+  test('a Twitch clip names this site as its parent', async ({ page }) => {
+    await stubPlayers(page);
+    await feedOf(page, [card('zz1', 'A clip', 'https://clips.twitch.tv/FunnyClip-abc')]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Play video' }).click();
+    await expect(page.locator('iframe[title="A clip"]')).toHaveAttribute(
+      'src', 'https://clips.twitch.tv/embed?clip=FunnyClip-abc&parent=127.0.0.1'
+    );
+  });
+
+  test('Spotify shows its player straight away', async ({ page }) => {
+    await stubPlayers(page);
+    await feedOf(page, [card('zz1', 'A song', 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC')]);
+    await page.goto('/');
+    await expect(page.locator('iframe[title="A song"]')).toHaveAttribute('src', 'https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC');
+  });
+
+  test('a Reddit video that is gone says so', async ({ page }) => {
+    await page.route('https://v.redd.it/**', (route) => route.fulfill({ status: 403, body: '' }));
+    await feedOf(page, [card('zz1', 'A video', 'https://v.redd.it/gonevideo1')]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Play video' }).click();
+    await expect(page.getByText('Video no longer available')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Original link' })).toHaveAttribute('href', 'https://v.redd.it/gonevideo1');
+  });
+});
+
 test.describe('Search engine markup', () => {
   const canonical = (html) => /<link rel="canonical" href="([^"]+)"/.exec(html)?.[1];
   // The origin is SITE_URL as built; the path is what matters

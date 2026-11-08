@@ -214,6 +214,24 @@ a.metaAuthor:hover {
   border: 0;
 }
 
+/* Portrait players (RedGIFs, TikTok) letterbox themselves inside a fixed height */
+.tallFrame {
+  height: min(75vh, 640px);
+  background: #000;
+}
+
+/* Spotify, SoundCloud and tweets set their height inline */
+.audioFrame,
+.tweetFrame {
+  border: none;
+  background: transparent;
+}
+
+.tweetFrame {
+  height: 420px;
+  max-width: 550px;
+}
+
 .videoPoster {
   position: relative;
   width: 100%;

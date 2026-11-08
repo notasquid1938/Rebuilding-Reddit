@@ -1,14 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getMedia, thumbnailUrl } from '@/lib/format';
+import { useShowNsfw } from '@/lib/hooks';
 import { ExternalIcon, PlayIcon } from './Icons';
 import styles from '@/styles/Post.module.css';
 
 const stop = (e) => e.stopPropagation();
 
-// Blurs NSFW / spoiler media until the reader chooses to reveal it
-const Reveal = ({ reason, children }) => {
-  const [revealed, setRevealed] = useState(!reason);
-  if (revealed) return children;
+// Blurs NSFW / spoiler media until the reader chooses to reveal it. NSFW
+// media stays unblurred for the session once the header's NSFW button is on;
+// spoilers still wait for a click
+const Reveal = ({ nsfw, spoiler, children }) => {
+  const [revealed, setRevealed] = useState(false);
+  const showNsfw = useShowNsfw();
+  const hideNsfw = nsfw && !showNsfw;
+  if (revealed || (!hideNsfw && !spoiler)) return children;
   return (
     <div className={styles.blurWrap}>
       <div className={styles.blurred} aria-hidden="true">{children}</div>
@@ -21,16 +26,16 @@ const Reveal = ({ reason, children }) => {
           setRevealed(true);
         }}
       >
-        {reason === 'nsfw' ? 'View NSFW content' : 'View spoiler'}
+        {hideNsfw ? 'View NSFW content' : 'View spoiler'}
       </button>
     </div>
   );
 };
 
-// Shown when an image can't be loaded any more, so the post still leads somewhere
-const MediaUnavailable = ({ href }) => (
+// Shown when an image or video can't be loaded any more, so the post still leads somewhere
+const MediaUnavailable = ({ href, what = 'Image' }) => (
   <div className={`${styles.mediaFrame} ${styles.mediaUnavailable}`}>
-    <span>Image no longer available</span>
+    <span>{what} no longer available</span>
     <span className={styles.mediaUnavailableLinks}>
       <a href={href} target="_blank" rel="noopener noreferrer nofollow" onClick={stop}>
         Original link <ExternalIcon size={12} />
@@ -64,40 +69,133 @@ const ImageMedia = ({ src, alt, href }) => {
   );
 };
 
-const YouTubeMedia = ({ id, thumb, title }) => {
-  const [playing, setPlaying] = useState(false);
+const PlayPoster = ({ thumb, onPlay }) => (
+  <button
+    type="button"
+    className={styles.videoPoster}
+    onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onPlay();
+    }}
+    aria-label="Play video"
+  >
+    {thumb && (
+      <img
+        src={thumb}
+        alt=""
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+      />
+    )}
+    <span className={styles.playBadge}>
+      <PlayIcon size={28} />
+    </span>
+  </button>
+);
+
+const FRAME_CLASS = { wide: styles.videoFrame, tall: styles.tallFrame, audio: styles.audioFrame, tweet: styles.tweetFrame };
+
+// A player from another site (YouTube, RedGIFs, Twitch, Spotify, ...); see getMedia
+const EmbedMedia = ({ media, title, thumb }) => {
+  const [playing, setPlaying] = useState(!media.play);
+  const [height, setHeight] = useState(media.height);
+  const frameRef = useRef(null);
+
+  // A tweet tells the page its height once rendered
+  useEffect(() => {
+    if (media.provider !== 'twitter') return undefined;
+    const onMessage = (e) => {
+      if (e.origin !== 'https://platform.twitter.com' || e.source !== frameRef.current?.contentWindow) return;
+      let data = e.data;
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch {
+          return;
+        }
+      }
+      const embed = data?.['twttr.embed'];
+      const size = embed?.method === 'twttr.private.resize' && embed.params?.[0];
+      if (size?.height > 0) setHeight(Math.ceil(size.height));
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [media.provider]);
+
+  const src = () => (media.provider === 'twitch' ? `${media.src}&parent=${window.location.hostname}` : media.src);
   return (
-    <div className={`${styles.mediaFrame} ${styles.videoFrame}`}>
+    <div className={`${styles.mediaFrame} ${FRAME_CLASS[media.frame]}`} style={height ? { height } : undefined}>
       {playing ? (
         <iframe
-          src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1`}
+          ref={frameRef}
+          src={src()}
           title={title}
-          allow="autoplay; encrypted-media; picture-in-picture"
+          loading="lazy"
+          allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
           allowFullScreen
           className={styles.videoEmbed}
         />
       ) : (
-        <button
-          type="button"
-          className={styles.videoPoster}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setPlaying(true);
-          }}
-          aria-label="Play video"
-        >
-          <img
-            src={thumb}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
-          />
-          <span className={styles.playBadge}>
-            <PlayIcon size={28} />
-          </span>
-        </button>
+        <PlayPoster thumb={thumb} onPlay={() => setPlaying(true)} />
+      )}
+    </div>
+  );
+};
+
+// Reddit-hosted video (v.redd.it). Its HLS stream carries the sound: Safari
+// plays it natively, other browsers through hls.js, loaded on the first play
+const RedditVideo = ({ id, thumb, href }) => {
+  const [playing, setPlaying] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!playing || !video) return undefined;
+    const base = `https://v.redd.it/${id}`;
+    const playlist = `${base}/HLSPlaylist.m3u8`;
+    const start = (source) => {
+      if (source) video.src = source;
+      video.play().catch(() => {});
+    };
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      start(playlist);
+      return undefined;
+    }
+    let hls = null;
+    let cancelled = false;
+    import('hls.js')
+      .then(({ default: Hls }) => {
+        if (cancelled) return;
+        // No Media Source Extensions: the MP4 Reddit kept without sound
+        if (!Hls.isSupported()) return start(`${base}/DASH_480.mp4`);
+        hls = new Hls();
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (!data.fatal) return;
+          hls.destroy();
+          hls = null;
+          setFailed(true);
+        });
+        hls.loadSource(playlist);
+        hls.attachMedia(video);
+        start();
+      })
+      .catch(() => setFailed(true));
+    return () => {
+      cancelled = true;
+      hls?.destroy();
+    };
+  }, [playing, id]);
+
+  if (failed) return <MediaUnavailable href={href} what="Video" />;
+  return (
+    <div className={`${styles.mediaFrame} ${styles.videoFrame}`}>
+      {playing ? (
+        <video ref={videoRef} className={styles.videoEmbed} controls playsInline onClick={stop} onError={() => setFailed(true)} />
+      ) : (
+        <PlayPoster thumb={thumb} onPlay={() => setPlaying(true)} />
       )}
     </div>
   );
@@ -157,10 +255,17 @@ const PostMedia = ({ post }) => {
         />
       </div>
     );
-  } else if (media.type === 'youtube') content = <YouTubeMedia {...media} title={post.title} />;
+  } else if (media.type === 'redditVideo') {
+    content = <RedditVideo id={media.id} thumb={thumbnailUrl(post)} href={post.url} />;
+  } else if (media.type === 'embed') {
+    content = <EmbedMedia media={media} title={post.title} thumb={media.thumb || thumbnailUrl(post)} />;
+  }
 
-  const reason = post.over_18 ? 'nsfw' : post.spoiler ? 'spoiler' : null;
-  return <Reveal reason={reason}>{content}</Reveal>;
+  return (
+    <Reveal nsfw={post.over_18} spoiler={post.spoiler}>
+      {content}
+    </Reveal>
+  );
 };
 
 export default PostMedia;

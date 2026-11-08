@@ -75,6 +75,10 @@
   background: var(--bg-secondary);
 }
 
+.iconButtonActive {
+  color: var(--brand);
+}
+
 .menuButton {
   display: none;
 }
