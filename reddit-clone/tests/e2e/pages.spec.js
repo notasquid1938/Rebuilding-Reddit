@@ -484,28 +484,31 @@ test.describe('Embedded media', () => {
       card('zz1', 'NSFW clip', 'https://www.redgifs.com/watch/FixtureClip', { over_18: true }),
       card('zz2', 'NSFW spoiler clip', 'https://www.redgifs.com/watch/OtherClip', { over_18: true, spoiler: true }),
     ]);
+    const players = page.locator('iframe[src^="https://www.redgifs.com/ifr/"]');
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(2);
-    await expect(page.getByRole('button', { name: 'Play video' })).toHaveCount(0);
+    // Nothing loads behind the blur
+    await expect(players).toHaveCount(0);
 
     const toggle = page.getByRole('button', { name: 'Show NSFW media without blur for this session' });
     await toggle.click();
     await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'View spoiler' })).toHaveCount(1);
-    await expect(page.getByRole('button', { name: 'Play video' })).toHaveCount(1);
+    await expect(players).toHaveCount(1);
 
     // The rest of the session, across reloads
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Play video' })).toHaveCount(1);
+    await expect(players).toHaveCount(1);
     await page.getByRole('button', { name: 'Blur NSFW media again' }).click();
     await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(2);
+    await expect(players).toHaveCount(0);
   });
 
-  test('a RedGIFs clip plays in place', async ({ page }) => {
+  test('a RedGIFs clip appears without a click', async ({ page }) => {
     await stubPlayers(page);
     await feedOf(page, [card('zz1', 'A clip', 'https://www.redgifs.com/watch/FixtureClip')]);
     await page.goto('/');
-    await page.getByRole('button', { name: 'Play video' }).click();
+    await expect(page.getByRole('button', { name: 'Play video' })).toHaveCount(0);
     await expect(page.locator('iframe[title="A clip"]')).toHaveAttribute('src', 'https://www.redgifs.com/ifr/fixtureclip');
   });
 

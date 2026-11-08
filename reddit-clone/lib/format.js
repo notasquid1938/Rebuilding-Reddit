@@ -131,7 +131,8 @@ export function getMedia(post) {
   // RedGIFs: /watch/<id>, /ifr/<id> and the i.redgifs.com stills share one id
   if (/(^|\.)redgifs\.com$/.test(host)) {
     m = /^\/(?:watch|ifr|i)\/([a-z0-9]+)/i.exec(pathname);
-    if (m) return embed(host, 'redgifs', `https://www.redgifs.com/ifr/${m[1].toLowerCase()}`, 'tall');
+    // Loads by itself (as on Reddit) and starts muted
+    if (m) return embed(host, 'redgifs', `https://www.redgifs.com/ifr/${m[1].toLowerCase()}`, 'tall', false);
   }
 
   if (host === 'streamable.com' && (m = /^\/(?:[eo]\/)?([a-z0-9]{4,12})$/i.exec(pathname))) {

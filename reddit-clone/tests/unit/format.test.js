@@ -121,7 +121,7 @@ describe('getMedia', () => {
   });
 
   it('embeds RedGIFs, including its stills, in a portrait frame', () => {
-    const clip = { type: 'embed', provider: 'redgifs', src: 'https://www.redgifs.com/ifr/klutzyconsciouspekingese', frame: 'tall', play: true };
+    const clip = { type: 'embed', provider: 'redgifs', src: 'https://www.redgifs.com/ifr/klutzyconsciouspekingese', frame: 'tall', play: false };
     expect(link('https://www.redgifs.com/watch/klutzyconsciouspekingese')).toMatchObject(clip);
     expect(link('https://v3.redgifs.com/watch/KlutzyConsciousPekingese')).toMatchObject(clip);
     expect(link('https://i.redgifs.com/i/klutzyconsciouspekingese.jpg')).toMatchObject(clip);

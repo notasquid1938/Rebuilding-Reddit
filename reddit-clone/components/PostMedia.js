@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { getMedia, thumbnailUrl } from '@/lib/format';
 import { useShowNsfw } from '@/lib/hooks';
 import { ExternalIcon, PlayIcon } from './Icons';
 import styles from '@/styles/Post.module.css';
 
 const stop = (e) => e.stopPropagation();
+
+// True under the blur, where players show a still instead of loading
+const Blurred = createContext(false);
 
 // Blurs NSFW / spoiler media until the reader chooses to reveal it. NSFW
 // media stays unblurred for the session once the header's NSFW button is on;
@@ -16,7 +19,9 @@ const Reveal = ({ nsfw, spoiler, children }) => {
   if (revealed || (!hideNsfw && !spoiler)) return children;
   return (
     <div className={styles.blurWrap}>
-      <div className={styles.blurred} aria-hidden="true">{children}</div>
+      <div className={styles.blurred} aria-hidden="true">
+        <Blurred.Provider value>{children}</Blurred.Provider>
+      </div>
       <button
         type="button"
         className={styles.revealButton}
@@ -99,7 +104,9 @@ const FRAME_CLASS = { wide: styles.videoFrame, tall: styles.tallFrame, audio: st
 
 // A player from another site (YouTube, RedGIFs, Twitch, Spotify, ...); see getMedia
 const EmbedMedia = ({ media, title, thumb }) => {
-  const [playing, setPlaying] = useState(!media.play);
+  const [clicked, setClicked] = useState(false);
+  const blurred = useContext(Blurred);
+  const playing = (clicked || !media.play) && !blurred;
   const [height, setHeight] = useState(media.height);
   const frameRef = useRef(null);
 
@@ -138,7 +145,7 @@ const EmbedMedia = ({ media, title, thumb }) => {
           className={styles.videoEmbed}
         />
       ) : (
-        <PlayPoster thumb={thumb} onPlay={() => setPlaying(true)} />
+        <PlayPoster thumb={thumb} onPlay={() => setClicked(true)} />
       )}
     </div>
   );
