@@ -10,10 +10,21 @@ import { SITE_URL } from '@/lib/site';
 // from the archive disk, slowing the site for everyone
 const SLOWED = ['ClaudeBot'];
 
-// Crawlers turned away. AhrefsBot is an SEO tool. PerplexityBot and Applebot
-// ignored Crawl-delay at ~3 pages a second each (Oct 30-31), keeping the
-// archive disk busy enough to crowd out Googlebot, and sent no visitors
-const BLOCKED = ['AhrefsBot', 'PerplexityBot', 'Applebot'];
+// Crawlers turned away. AhrefsBot and SERankingBacklinksBot are SEO tools.
+// PerplexityBot and Applebot ignored Crawl-delay at ~3 pages a second each
+// (Oct 30-31), keeping the archive disk busy enough to crowd out Googlebot,
+// and sent no visitors. Amazonbot, Reflectionbot and ElevenlabsCrawler are AI
+// crawlers that kept the archive disk saturated overnight (Nov 11, ~35k, ~20k
+// and several thousand pages a day) and sent no visitors either
+const BLOCKED = [
+  'AhrefsBot',
+  'SERankingBacklinksBot',
+  'PerplexityBot',
+  'Applebot',
+  'Amazonbot',
+  'Reflectionbot',
+  'ElevenlabsCrawler',
+];
 
 const RULES = [
   ...SLOWED.flatMap((agent) => [`User-agent: ${agent}`, 'Crawl-delay: 5', 'Allow: /', 'Disallow: /stats/', '']),
