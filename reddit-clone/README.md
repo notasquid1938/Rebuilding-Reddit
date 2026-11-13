@@ -17,7 +17,7 @@ The website and data pipeline for Reddit Rebuilt. See the [main README](../READM
 | `scrape_icons.py` | Append-only subreddit icon downloader |
 | `indexnow.py` | Tells Bing and the other IndexNow engines about pages (key served at `/indexnow.txt`) |
 | `entrypoint-loader.sh` | Loader container loop: fetch → load → refresh → subreddits → icons |
-| `scripts/` | SQL for indexes and lookup tables (run by the loader; usable by hand) |
+| `scripts/` | SQL for indexes and lookup tables (run by the loader; usable by hand); the night-time disk cap `disk_quiet.sh` and its systemd units |
 
 ## Maintenance scripts
 
@@ -39,6 +39,16 @@ docker exec reddit-rebuilt-db psql -U postgres -d Reddit-Rebuilt -Atc \
   "SELECT '/r/' || name FROM subreddits_metadata WHERE post_count >= 10000" | \
   INDEXNOW_KEY=$(grep ^INDEXNOW_KEY= .env | cut -d= -f2) python3 indexnow.py
 ```
+
+To keep the archive hard disk quiet at night, `scripts/disk_quiet.sh` limits the database container to about 30% of the disk from 23:00 to 08:00 (Linux cgroup v2 `io.max`; the website keeps serving, more slowly). A systemd timer re-applies it every 5 minutes, which also covers a recreated container. Install it as root:
+
+```bash
+sudo install -m 755 scripts/disk_quiet.sh /usr/local/sbin/reddit-disk-quiet
+sudo install -m 644 scripts/systemd/reddit-disk-quiet.service scripts/systemd/reddit-disk-quiet.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now reddit-disk-quiet.timer && sudo systemctl start reddit-disk-quiet.service
+```
+
+Change the hours with `Environment=QUIET_HOURS=` in the service, or the limit with `NIGHT_LIMIT=` (default `riops=50 wiops=50 rbps=20971520 wbps=20971520`); `journalctl -u reddit-disk-quiet` shows when the cap went on and off.
 
 ## Development
 
