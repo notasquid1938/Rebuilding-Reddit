@@ -15,7 +15,9 @@ const SLOWED = ['ClaudeBot'];
 // (Oct 30-31), keeping the archive disk busy enough to crowd out Googlebot,
 // and sent no visitors. Amazonbot, Reflectionbot and ElevenlabsCrawler are AI
 // crawlers that kept the archive disk saturated overnight (Nov 11, ~35k, ~20k
-// and several thousand pages a day) and sent no visitors either
+// and several thousand pages a day) and sent no visitors either. GPTBot is
+// OpenAI's training crawler, ~6,000 pages an hour (Nov 14-15); ChatGPT search
+// uses OAI-SearchBot, which stays allowed
 const BLOCKED = [
   'AhrefsBot',
   'SERankingBacklinksBot',
@@ -24,6 +26,7 @@ const BLOCKED = [
   'Amazonbot',
   'Reflectionbot',
   'ElevenlabsCrawler',
+  'GPTBot',
 ];
 
 const RULES = [

@@ -338,10 +338,11 @@ test.describe('Sitemaps', () => {
   test('robots.txt slows ClaudeBot and turns away SEO tools and AI crawlers that send no visitors', async ({ request }) => {
     const text = await (await request.get('/robots.txt')).text();
     expect(text).toMatch(/User-agent: ClaudeBot\nCrawl-delay: 5\nAllow: \/\nDisallow: \/stats\/\n/);
-    const blocked = ['AhrefsBot', 'SERankingBacklinksBot', 'PerplexityBot', 'Applebot', 'Amazonbot', 'Reflectionbot', 'ElevenlabsCrawler'];
+    const blocked = ['AhrefsBot', 'SERankingBacklinksBot', 'PerplexityBot', 'Applebot', 'Amazonbot', 'Reflectionbot', 'ElevenlabsCrawler', 'GPTBot'];
     for (const agent of blocked) {
       expect(text).toMatch(new RegExp(`User-agent: ${agent}\\nDisallow: /\\n\\n`));
     }
+    expect(text).not.toContain('OAI-SearchBot');
     expect(text).toMatch(/User-agent: \*\nAllow: \//);
   });
 
