@@ -40,7 +40,7 @@ docker exec reddit-rebuilt-db psql -U postgres -d Reddit-Rebuilt -Atc \
   INDEXNOW_KEY=$(grep ^INDEXNOW_KEY= .env | cut -d= -f2) python3 indexnow.py
 ```
 
-To keep the archive hard disk quiet at night, `scripts/disk_quiet.sh` limits the database container to about 30% of the disk from 23:00 to 08:00 (Linux cgroup v2 `io.max`; the website keeps serving, more slowly). A systemd timer re-applies it every 5 minutes, which also covers a recreated container. Install it as root:
+To keep the archive hard disk quiet at night, `scripts/disk_quiet.sh` limits the database container to about a third of the disk from 23:00 to 08:00 (Linux cgroup v2 `io.max`; the website keeps serving, more slowly). A systemd timer re-applies it every 5 minutes, which also covers a recreated container. Install it as root:
 
 ```bash
 sudo install -m 755 scripts/disk_quiet.sh /usr/local/sbin/reddit-disk-quiet
@@ -48,7 +48,7 @@ sudo install -m 644 scripts/systemd/reddit-disk-quiet.service scripts/systemd/re
 sudo systemctl daemon-reload && sudo systemctl enable --now reddit-disk-quiet.timer && sudo systemctl start reddit-disk-quiet.service
 ```
 
-Change the hours with `Environment=QUIET_HOURS=` in the service, or the limit with `NIGHT_LIMIT=` (default `riops=50 wiops=50 rbps=20971520 wbps=20971520`); `journalctl -u reddit-disk-quiet` shows when the cap went on and off.
+Change the hours with `Environment=QUIET_HOURS=` in the service, or the limit with `NIGHT_LIMIT=` (default `riops=70 wiops=70 rbps=20971520 wbps=20971520`); `journalctl -u reddit-disk-quiet` shows when the cap went on and off.
 
 ## Development
 

@@ -10,9 +10,10 @@ set -eu
 CONTAINER=${CONTAINER:-reddit-rebuilt-db}
 DISK=${DISK:-/media/ben-server/Jumbo}
 QUIET_HOURS=${QUIET_HOURS:-23-8}
-# The archive disk manages ~250 random reads a second flat out; 50 keeps it
-# about 30% busy. The byte limits bound long sequential scans the same way
-NIGHT_LIMIT=${NIGHT_LIMIT:-riops=50 wiops=50 rbps=20971520 wbps=20971520}
+# The archive disk manages ~250 random reads a second flat out; 70 keeps it
+# about a third busy (50 left the site failing 10-15% of requests overnight).
+# The byte limits bound long sequential scans the same way
+NIGHT_LIMIT=${NIGHT_LIMIT:-riops=70 wiops=70 rbps=20971520 wbps=20971520}
 DAY_LIMIT='riops=max wiops=max rbps=max wbps=max'
 CGROUP_ROOT=${CGROUP_ROOT:-/sys/fs/cgroup/system.slice}
 HOUR=${HOUR:-$(date +%-H)}

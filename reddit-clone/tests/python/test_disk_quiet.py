@@ -8,7 +8,7 @@ from conftest import ROOT
 
 SCRIPT = os.path.join(ROOT, 'scripts', 'disk_quiet.sh')
 CONTAINER_ID = 'abc123'
-NIGHT = 'riops=50 wiops=50 rbps=20971520 wbps=20971520'
+NIGHT = 'riops=70 wiops=70 rbps=20971520 wbps=20971520'
 DAY = 'riops=max wiops=max rbps=max wbps=max'
 
 
