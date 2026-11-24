@@ -79,6 +79,8 @@ describe('input validation', () => {
     expect(isMonth(undefined)).toBe(false);
     expect(SUBREDDIT_RE.test('reddit.com')).toBe(true);
     expect(SUBREDDIT_RE.test('a"; DROP TABLE x')).toBe(false);
+    expect(SUBREDDIT_RE.test('u_Far-Glass')).toBe(true);
+    expect(SUBREDDIT_RE.test('Far-Glass')).toBe(false);
     expect(AUTHOR_RE.test('some-user_1')).toBe(true);
     expect(AUTHOR_RE.test('[deleted]')).toBe(false);
     expect(ID_RE.test('b001')).toBe(true);

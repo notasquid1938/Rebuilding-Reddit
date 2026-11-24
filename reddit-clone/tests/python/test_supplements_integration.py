@@ -41,7 +41,7 @@ def one(cur, query, params=None):
 
 
 def test_reports_what_each_source_added(first_run):
-    assert 'scrape2013 2006-01: 3 posts, 1 recovered (1 merged), 1 excluded' in first_run
+    assert 'scrape2013 2006-01: 3 posts, 2 recovered (2 merged)' in first_run
     assert 'BannedSub_subreddit: 2 posts, 1 recovered (1 merged)' in first_run
     assert 'HtmlSub_archive: 1 posts, 1 recovered (1 merged)' in first_run
 
@@ -53,12 +53,12 @@ def test_recovered_posts_join_their_months(db):
     assert one(db, "SELECT title, subreddit, score FROM rs_2006_02 WHERE id = 'd0cc'") == (
         'Recovered from & HTML', 'HtmlSub', 9)
     assert one(db, "SELECT source FROM rs_extra WHERE id = 'd0cc'")[0] == 'archive:HtmlSub_archive'
+    assert one(db, "SELECT subreddit FROM rs_2006_01 WHERE id = 'jb02'")[0] == 'BannedForContent'
 
 
-def test_archived_and_excluded_posts_are_not_added(db):
+def test_archived_posts_are_not_added_again(db):
     assert one(db, "SELECT count(*) FROM rs_2006_01 WHERE id = 'c001'")[0] == 1
     assert one(db, "SELECT count(*) FROM rs_2006_02 WHERE id = 'd001'")[0] == 1
-    assert one(db, "SELECT count(*) FROM rs_extra WHERE id = 'jb02'")[0] == 0
 
 
 def test_lookup_tables_refreshed(db):

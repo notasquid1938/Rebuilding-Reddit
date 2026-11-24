@@ -2,34 +2,24 @@ import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { decodeEntities } from '@/lib/format';
+import { linkTarget } from '@/lib/links';
 
-const REDDIT_HOST_RE = /^https?:\/\/(?:www\.|old\.|new\.|np\.)?reddit\.com/i;
-
-// Point links to Reddit threads, communities and users at their archived copies
-function localHref(href) {
-  if (!href) return null;
-  const path = href.replace(REDDIT_HOST_RE, '');
-  if (!path.startsWith('/')) return null;
-  let m = /^\/r\/[^/]+\/comments\/([a-z0-9]+)/i.exec(path);
-  if (m) return `/Thread/${m[1].toLowerCase()}`;
-  m = /^\/r\/([A-Za-z0-9_.]+)\/?$/.exec(path);
-  if (m) return `/r/${m[1]}`;
-  m = /^\/u(?:ser)?\/([A-Za-z0-9_-]+)\/?$/.exec(path);
-  if (m) return `/User/${m[1]}`;
-  return null;
-}
-
+// A link with no text is a community's CSS trick (`[](/flair)` drew an icon on
+// Reddit) and shows nothing
 const MarkdownLink = ({ href, children }) => {
-  const local = localHref(href);
-  if (local) {
+  const empty = !children || (Array.isArray(children) && children.length === 0);
+  if (empty) return null;
+  const target = linkTarget(href);
+  if (!target) return <span>{children}</span>;
+  if (target.local) {
     return (
-      <Link href={local} onClick={(e) => e.stopPropagation()}>
+      <Link href={target.local} onClick={(e) => e.stopPropagation()}>
         {children}
       </Link>
     );
   }
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer nofollow ugc" onClick={(e) => e.stopPropagation()}>
+    <a href={target.href} target="_blank" rel="noopener noreferrer nofollow ugc" onClick={(e) => e.stopPropagation()}>
       {children}
     </a>
   );

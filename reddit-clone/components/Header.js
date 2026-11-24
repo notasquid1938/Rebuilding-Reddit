@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import SearchBar from './SearchBar';
-import { MenuIcon, MoonIcon, SunIcon, CodeIcon } from './Icons';
-import { useTheme } from '@/lib/hooks';
+import { MenuIcon, MoonIcon, SunIcon, CodeIcon, EyeIcon, EyeOffIcon } from './Icons';
+import { setShowNsfw, useShowNsfw, useTheme } from '@/lib/hooks';
 import styles from '@/styles/Layout.module.css';
 
 export const Logo = () => (
@@ -21,6 +21,7 @@ export const Logo = () => (
 
 const Header = ({ onToggleNav }) => {
   const [theme, toggleTheme] = useTheme();
+  const showNsfw = useShowNsfw();
 
   return (
     <header className={styles.header}>
@@ -36,6 +37,16 @@ const Header = ({ onToggleNav }) => {
       </div>
 
       <div className={styles.headerRight}>
+        <button
+          type="button"
+          className={`${styles.iconButton} ${showNsfw ? styles.iconButtonActive : ''}`}
+          onClick={() => setShowNsfw(!showNsfw)}
+          aria-pressed={showNsfw}
+          aria-label={showNsfw ? 'Blur NSFW media again' : 'Show NSFW media without blur for this session'}
+          title={showNsfw ? 'NSFW media shown (this session). Click to blur again' : 'Show NSFW media without blur'}
+        >
+          {showNsfw ? <EyeIcon /> : <EyeOffIcon />}
+        </button>
         <button
           type="button"
           className={styles.iconButton}

@@ -1,5 +1,5 @@
 import { checkRateLimit, getClientIp } from '../../middleware/rateLimit';
-import { queryPosts, resolveSubreddit, isMonth, SUBREDDIT_RE, AUTHOR_RE, FeedNotReadyError } from '@/lib/submissions';
+import { queryPosts, resolveSubreddit, isMonth, SUBREDDIT_RE, AUTHOR_RE, FeedNotReadyError, BusyError } from '@/lib/submissions';
 import { isSort } from '@/lib/sorts';
 
 export default async function handler(req, res) {
@@ -43,6 +43,10 @@ export default async function handler(req, res) {
       return res.status(503).json({
         error: 'This sort is still being prepared for some of these months. Try Top, or check back later.',
       });
+    }
+    if (error instanceof BusyError) {
+      res.setHeader('Retry-After', '30');
+      return res.status(503).json({ error: 'The archive is busy. Try again in a moment.' });
     }
     console.error('Error fetching posts:', error.message);
     const timedOut = error.code === '57014';

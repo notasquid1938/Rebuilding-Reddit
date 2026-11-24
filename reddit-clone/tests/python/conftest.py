@@ -17,8 +17,8 @@ def integration_mode():
 
 # Each marker runs only in its phase of tests/run-integration.sh:
 # "integration" right after the fixtures load, "gapfill" once the website tests
-# are done, then "supplements"
-PHASES = {'integration': '1', 'gapfill': 'gapfill', 'supplements': 'supplements'}
+# are done, then "supplements" and "wayback"
+PHASES = {'integration': '1', 'gapfill': 'gapfill', 'supplements': 'supplements', 'wayback': 'wayback'}
 
 
 def pytest_collection_modifyitems(config, items):
@@ -33,3 +33,4 @@ def pytest_configure(config):
     config.addinivalue_line('markers', 'integration: needs the loaded test database')
     config.addinivalue_line('markers', 'gapfill: runs gapfill_loader.py against the loaded test database')
     config.addinivalue_line('markers', 'supplements: runs supplements_loader.py against the loaded test database')
+    config.addinivalue_line('markers', 'wayback: runs wayback_threads.py against the loaded test database')

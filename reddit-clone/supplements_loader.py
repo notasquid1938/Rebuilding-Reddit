@@ -14,8 +14,7 @@ A post is added only if no month table (nor rs_extra) has its id. Ids are
 checked through post_id_ranges and each month's id index, a batch at a time,
 so memory stays small. New posts go into rs_extra (source "scrape2013" or
 "archive:<item>") and are merged into their month together with
-refresh_month(), exactly like the gap-fill's. Communities in GAPFILL_EXCLUDE
-are never added.
+refresh_month(), exactly like the gap-fill's.
 
 Progress is recorded per file in loader_state ("supplement/scrape2013/<file>",
 "supplement/archive/<item>"), so reruns skip finished work and an interrupted
@@ -25,7 +24,7 @@ Files already present under DATA_DIR/supplements/<source>/ are used instead of
 downloading them (scrape2013/Posts_YYYY-MM.json.tar.gz, archives/<item>/...).
 
 Usage: python3 supplements_loader.py [scrape2013|archives|all]   (default all)
-Environment: DATA_DIR, GAPFILL_EXCLUDE, SUPPLEMENT_SCRAPE_MONTHS and
+Environment: DATA_DIR, LOADER_QUIET_HOURS (quiet_hours.py), SUPPLEMENT_SCRAPE_MONTHS and
 SUPPLEMENT_ARCHIVE_ITEMS (comma lists replacing the defaults), plus the
 POSTGRES_* variables.
 """
@@ -51,8 +50,10 @@ import numpy as np
 import requests
 from psycopg2 import sql
 
-from dump_loader import KINDS, connect, copy_chunk, encode_row, ensure_state_table, merge_extra, wait_for_db
-from gapfill_loader import EXCLUDE, EXTRA_COLUMNS, NUMERIC_FLAGS, ensure_extra_table, month_of
+import quiet_hours
+from dump_loader import (KINDS, REFRESH_MINUTES, connect, copy_chunk, encode_row, ensure_state_table, merge_extra,
+                         wait_for_db)
+from gapfill_loader import EXTRA_COLUMNS, NUMERIC_FLAGS, ensure_extra_table, month_of
 
 DATA_DIR = os.getenv('DATA_DIR', os.getcwd())
 LOCAL_DIR = os.path.join(DATA_DIR, 'supplements')
@@ -64,6 +65,8 @@ if os.getenv('SUPPLEMENT_SCRAPE_MONTHS'):
     SCRAPE_MONTHS = [m.strip() for m in os.getenv('SUPPLEMENT_SCRAPE_MONTHS').split(',') if m.strip()]
 COLUMNS = KINDS['submissions']['site_columns']
 BATCH = 50000
+# Expected time to read one scrape month or archive item and look up its posts
+SOURCE_MINUTES = 30
 
 # Internet Archive items that hold posts the dumps don't have (checked October
 # 2026); one per community, preferring the copy with the archiver's CSV data
@@ -118,10 +121,6 @@ def normalize(record, subreddit=None):
     if 'url' in post and 'domain' not in post:
         post['domain'] = urllib.parse.urlsplit(str(post['url'])).hostname or None
     return post
-
-
-def is_excluded(post):
-    return str(post.get('subreddit') or '').lower() in EXCLUDE
 
 
 def json_posts(value):
@@ -322,7 +321,7 @@ class Archive:
 # ---------- loading ----------
 
 def new_stats():
-    return {'posts': 0, 'present': 0, 'added': 0, 'duplicate': 0, 'excluded': 0, 'unusable': 0, 'failed': 0,
+    return {'posts': 0, 'present': 0, 'added': 0, 'duplicate': 0, 'unusable': 0, 'failed': 0,
             'by_month': Counter()}
 
 
@@ -354,9 +353,6 @@ def add_posts(conn, archive, records, source, stats, seen):
             stats['duplicate'] += 1
             continue
         seen.add(post['id'])
-        if is_excluded(post):
-            stats['excluded'] += 1
-            continue
         batch.append(post)
         if len(batch) >= BATCH:
             flush(batch)
@@ -376,6 +372,7 @@ def merge_months(conn, months):
         table = f'rs_{month}'
         if table not in tables:
             continue  # stays in rs_extra; dump_loader merges it if the month is ever loaded
+        quiet_hours.wait('supplements', REFRESH_MINUTES)
         with conn.cursor() as cur:
             added = merge_extra(cur, table)
             if added:
@@ -484,12 +481,13 @@ def run(source):
             key = f'supplement/scrape2013/Posts_{month}.json.tar.gz'
             if key in done:
                 continue
+            quiet_hours.wait('supplements', SOURCE_MINUTES)
             stats = new_stats()
             add_posts(conn, archive, scrape_records(month), 'scrape2013', stats, seen)
             merged = merge_months(conn, stats['by_month'])
             record_done(conn, key, stats)
             print(f"[supplements] scrape2013 {month}: {stats['posts']:,} posts, {stats['added']:,} recovered "
-                  f"({merged:,} merged), {stats['excluded']:,} excluded", flush=True)
+                  f"({merged:,} merged)", flush=True)
             totals['added'] += stats['added']
 
     if source in ('archives', 'all'):
@@ -498,6 +496,7 @@ def run(source):
             key = f'supplement/archive/{item}'
             if key in done:
                 continue
+            quiet_hours.wait('supplements', SOURCE_MINUTES)
             stats = new_stats()
             workdir = tempfile.mkdtemp(prefix='supplement-', dir=LOCAL_DIR if os.path.isdir(LOCAL_DIR) else None)
             try:

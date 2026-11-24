@@ -166,6 +166,12 @@ test.describe('Comments', () => {
     expect(comments.map((c) => c.id)).toEqual(['k004', 'k005']);
   });
 
+  test('serves comments on a post no archive has', async ({ request }) => {
+    const { comments } = await get(request, '/api/Comments?id=c0zz&month=2006-01');
+    expect(comments.map((c) => c.id)).toEqual(['m101']);
+    expect(comments[0].replies.map((c) => c.id)).toEqual(['m102', 'm105']);
+  });
+
   test('reports months without comment dumps', async ({ request }) => {
     expect(await get(request, '/api/Comments?id=e001&month=2010-06')).toEqual({ available: false, comments: [] });
   });
@@ -257,8 +263,18 @@ test.describe('Random', () => {
 });
 
 test.describe('User', () => {
-  test('totals posts and karma', async ({ request }) => {
-    expect(await get(request, '/api/User?name=alice')).toMatchObject({ posts: 4, karma: 5000 + 4000 + 777 + 100 });
+  test('gives first and latest post dates and months with posts', async ({ request }) => {
+    const stats = await get(request, '/api/User?name=alice');
+    expect(stats).toEqual({
+      name: 'alice',
+      firstPost: Date.UTC(2005, 11, 10) / 1000,
+      lastPost: Date.UTC(2010, 5, 15) / 1000,
+      activeMonths: 4,
+    });
+  });
+
+  test('has no dates for an account without posts', async ({ request }) => {
+    expect(await get(request, '/api/User?name=nobody_here')).toMatchObject({ firstPost: null, lastPost: null });
   });
 });
 
@@ -317,5 +333,29 @@ test.describe('Sitemaps', () => {
     expect(text).toContain('User-agent: *');
     expect(text).toMatch(/^Sitemap: http:\/\/127\.0\.0\.1:\d+\/sitemap\.xml$/m);
     expect(text).not.toContain('page=2');
+  });
+
+  test('robots.txt slows ClaudeBot and turns away SEO tools and AI crawlers that send no visitors', async ({ request }) => {
+    const text = await (await request.get('/robots.txt')).text();
+    expect(text).toMatch(/User-agent: ClaudeBot\nCrawl-delay: 5\nAllow: \/\nDisallow: \/stats\/\n/);
+    const blocked = ['AhrefsBot', 'SERankingBacklinksBot', 'PerplexityBot', 'Applebot', 'Amazonbot', 'Reflectionbot', 'ElevenlabsCrawler', 'GPTBot', 'meta-externalagent', 'ShapBot'];
+    for (const agent of blocked) {
+      expect(text).toMatch(new RegExp(`User-agent: ${agent}\\nDisallow: /\\n\\n`));
+    }
+    expect(text).not.toContain('OAI-SearchBot');
+    expect(text).toMatch(/User-agent: \*\nAllow: \//);
+  });
+
+  test('serves the IndexNow key as plain text', async ({ request }) => {
+    const res = await request.get('/indexnow.txt');
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('text/plain');
+    expect(await res.text()).toBe('test-indexnow-key');
+  });
+
+  test('robots.txt keeps crawlers away from the analytics beacon', async ({ request }) => {
+    const text = await (await request.get('/robots.txt')).text();
+    expect(text).toMatch(/User-agent: ClaudeBot\nCrawl-delay: 5\nAllow: \/\nDisallow: \/stats\/\n/);
+    expect(text).toMatch(/User-agent: \*\nAllow: \/\nDisallow: \/stats\/\n/);
   });
 });

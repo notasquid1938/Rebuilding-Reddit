@@ -1,5 +1,5 @@
 import { checkRateLimit, getClientIp } from '../../middleware/rateLimit';
-import { getUserStats, AUTHOR_RE } from '@/lib/submissions';
+import { getUserStats, AUTHOR_RE, BusyError } from '@/lib/submissions';
 
 export default async function handler(req, res) {
   const ip = getClientIp(req);
@@ -18,6 +18,10 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.status(200).json(stats);
   } catch (error) {
+    if (error instanceof BusyError) {
+      res.setHeader('Retry-After', '30');
+      return res.status(503).json({ error: 'The archive is busy. Try again in a moment.' });
+    }
     // Very prolific accounts can exceed the statement timeout; the page works without stats
     console.error('Error fetching user stats:', error.message);
     res.status(error.code === '57014' ? 504 : 500).json({ error: 'Could not load user stats' });

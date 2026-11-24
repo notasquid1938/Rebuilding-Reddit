@@ -3,21 +3,36 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
-import Feed from '@/components/Feed';
+import Feed, { PAGE_SIZE } from '@/components/Feed';
 import FeedControls from '@/components/FeedControls';
 import SubredditIcon from '@/components/SubredditIcon';
 import HistoryChart from '@/components/HistoryChart';
 import { ShuffleIcon } from '@/components/Icons';
 import { CommunityCard, TopCommunitiesCard, SidebarFooter } from '@/components/Sidebar';
 import { addRecentCommunity } from '@/lib/hooks';
+import { track } from '@/lib/analytics';
 import { formatCount, monthLabel } from '@/lib/format';
 import { rangeFromQuery, rangeToQuery } from '@/lib/range';
-import { SITE_NAME } from '@/lib/site';
+import { SITE_NAME, SITE_URL } from '@/lib/site';
 import { FEED_SORTS, sortFromQuery, withSort } from '@/lib/sorts';
 import styles from '@/styles/Profile.module.css';
 
-export async function getServerSideProps({ params, res }) {
-  const { getSubredditInfo, SUBREDDIT_RE } = await import('@/lib/submissions');
+// The feed a community page shows for its URL's sort and date range
+const feedQueryFor = (name, query) => {
+  const range = rangeFromQuery(query, null);
+  return { subreddit: name, startDate: range?.from, endDate: range?.to, sort: sortFromQuery(query, 'top') };
+};
+
+// Search engines show 70-160 characters, so a short community blurb is
+// followed by what the archive holds
+function communityDescription(name, blurb) {
+  const archive = `Top posts from r/${name} in any month of Reddit's history, archived with their comments on ${SITE_NAME}.`;
+  const text = (blurb || '').replace(/\s+/g, ' ').trim();
+  return (text.length >= 70 ? text : [text, archive].filter(Boolean).join(' · ')).slice(0, 160);
+}
+
+export async function getServerSideProps({ params, query, res }) {
+  const { getSubredditInfo, firstFeedPage, SUBREDDIT_RE } = await import('@/lib/submissions');
   const name = params.name;
   if (!SUBREDDIT_RE.test(name)) return { notFound: true };
 
@@ -31,8 +46,9 @@ export async function getServerSideProps({ params, res }) {
   if (info && info.name !== name) {
     return { redirect: { destination: `/r/${encodeURIComponent(info.name)}`, permanent: true } };
   }
+  const firstPage = info?.posts > 0 ? await firstFeedPage(feedQueryFor(info.name, query), PAGE_SIZE) : null;
   res.setHeader('Cache-Control', 'public, s-maxage=3600');
-  return { props: { name: info?.name || name, info } };
+  return { props: { name: info?.name || name, info, firstPage } };
 }
 
 const CommunityBanner = ({ name, info }) => {
@@ -73,14 +89,19 @@ const CommunityBanner = ({ name, info }) => {
   );
 };
 
-function CommunityPage({ name, info }) {
+function CommunityPage({ name, info, firstPage }) {
   const router = useRouter();
   const range = rangeFromQuery(router.query, null);
   const sort = sortFromQuery(router.query, 'top');
-  const feedQuery = { subreddit: name, startDate: range?.from, endDate: range?.to, sort };
+  const feedQuery = feedQueryFor(name, router.query);
 
   useEffect(() => {
     if (info?.posts) addRecentCommunity(name);
+  }, [name, info]);
+
+  // Shows which communities people look for that the archive doesn't have
+  useEffect(() => {
+    if (!info) track('community-not-archived', { community: name });
   }, [name, info]);
 
   const setRange = (next) => {
@@ -106,11 +127,9 @@ function CommunityPage({ name, info }) {
     >
       <Head>
         <title>{`r/${name} - ${SITE_NAME}`}</title>
-        <meta
-          name="description"
-          content={info?.about?.publicDescription || `Archived top posts from r/${name}, rebuilt from Reddit's history.`}
-        />
+        <meta name="description" content={communityDescription(name, info?.about?.publicDescription)} />
         <meta property="og:title" content={`r/${name}`} />
+        <link rel="canonical" href={`${SITE_URL}/r/${encodeURIComponent(name)}`} />
       </Head>
 
       <FeedControls sort={sort} sorts={FEED_SORTS} onSortChange={setSort} range={range} onRangeChange={setRange} />
@@ -118,6 +137,7 @@ function CommunityPage({ name, info }) {
       <Feed
         key={JSON.stringify(feedQuery)}
         query={feedQuery}
+        initial={firstPage?.key === JSON.stringify(feedQuery) ? firstPage : null}
         context="subreddit"
         emptyMessage={
           info

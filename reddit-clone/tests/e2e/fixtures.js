@@ -35,5 +35,7 @@ export const FIXTURE = {
   nsfwPost: { id: 'b003', title: 'NSFW spoiler post' },
   lockedPost: { id: 'b005' },
   laterPost: { id: 'e001', title: 'History question from 2010', subreddit: 'AskHistory' },
+  // Only its comments were archived
+  missingPost: { id: 'c0zz', subreddit: 'programming', month: '2006-01' },
   postsInDefaultRange: 45 + 32 + 11,
 };

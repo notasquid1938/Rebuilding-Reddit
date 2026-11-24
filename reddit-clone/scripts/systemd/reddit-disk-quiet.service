@@ -1,0 +1,8 @@
+[Unit]
+Description=Cap the Reddit Rebuilt database's archive-disk use at night
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=QUIET_HOURS=23-8
+ExecStart=/usr/local/sbin/reddit-disk-quiet

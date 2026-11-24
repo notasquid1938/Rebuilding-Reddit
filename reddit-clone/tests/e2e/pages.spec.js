@@ -147,6 +147,33 @@ test.describe('Thread', () => {
     await expect(page.getByText(/· locked/)).toBeVisible();
   });
 
+  test('shows the comments of a post no archive has', async ({ page }) => {
+    const response = await page.goto(`/Thread/${FIXTURE.missingPost.id}`);
+    expect(response.status()).toBe(200);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText("This post wasn't archived");
+    await expect(page.locator('article').getByRole('link', { name: 'r/programming' })).toBeVisible();
+    await expect(page.locator('article')).toContainText('Jan 2006');
+    const comments = page.getByRole('region', { name: 'Comments' });
+    await expect(comments.getByText('Comment on a post no archive has')).toBeVisible();
+    await expect(comments.getByText('Reply under the missing post')).toBeVisible();
+    // From rc_extra: recovered comments sit with the archived ones
+    await expect(comments.getByText('Recovered reply from a saved page')).toBeVisible();
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+    await expect(page).toHaveTitle('Unarchived post : r/programming');
+  });
+
+  test('links in archived text go where Reddit sent them', async ({ page }) => {
+    await page.goto(`/Thread/${FIXTURE.missingPost.id}`);
+    const comment = page.locator('#t1_m105');
+    // A path with no host meant Reddit; on this site it would be a 404
+    await expect(comment.getByRole('link', { name: 'the wiki' })).toHaveAttribute('href', 'https://www.reddit.com/r/korea/wiki');
+    // `[](/SB50)` drew a CSS icon on Reddit; here it's nothing
+    await expect(comment.locator('a[href*="SB50"]')).toHaveCount(0);
+    // A relative link would resolve against this page, so it's plain text
+    await expect(comment.getByText('the picture')).toBeVisible();
+    await expect(comment.getByRole('link', { name: 'the picture' })).toHaveCount(0);
+  });
+
   test('unknown posts are a 404', async ({ page }) => {
     const response = await page.goto('/Thread/zzzzzz');
     expect(response.status()).toBe(404);
@@ -222,8 +249,10 @@ test.describe('User', () => {
   test('lists posts newest first with stats', async ({ page }) => {
     await page.goto('/User/alice');
     expect((await feedTitles(page))[0]).toBe(FIXTURE.laterPost.title);
-    await expect(page.getByText('9.9K')).toBeVisible();
-    await expect(page.getByText('Archived posts')).toBeVisible();
+    await expect(page.getByText('First post')).toBeVisible();
+    await expect(page.getByText('Dec 10, 2005')).toBeVisible();
+    await expect(page.getByText('Months with posts')).toBeVisible();
+    await expect(page.getByText('Post karma')).toHaveCount(0);
   });
 
   test('top sort', async ({ page }) => {
@@ -317,6 +346,73 @@ test.describe('Random post', () => {
   });
 });
 
+test.describe('Server-rendered feeds', () => {
+  // Crawlers that don't run scripts still see the posts
+  const htmlTitles = async (request, url) => {
+    const html = await (await request.get(url)).text();
+    return [...html.matchAll(/<a href="\/Thread\/\w+">([^<]+)<\/a><\/h3>/g)].map((m) => m[1]);
+  };
+
+  test('community pages include their first page of posts in the URL sort', async ({ request }) => {
+    const top = await htmlTitles(request, '/r/programming');
+    expect(top[0]).toBe('January winner');
+    expect(top).toHaveLength(15);
+    expect((await htmlTitles(request, '/r/programming?sort=comments'))[0]).toBe('What is &lt;markdown&gt;?');
+  });
+
+  test('profiles include their first page of posts in the URL sort', async ({ request }) => {
+    expect(await htmlTitles(request, '/User/alice')).toEqual([
+      FIXTURE.laterPost.title,
+      'February programming post',
+      'January winner',
+      'Top &amp; best post of December',
+    ]);
+    expect((await htmlTitles(request, '/User/alice?sort=top'))[0]).toBe('Top &amp; best post of December');
+  });
+
+  test('the browser does not fetch the server-rendered page again', async ({ page }) => {
+    const firstPages = [];
+    page.on('request', (r) => r.url().includes('/api/Posts') && r.url().includes('page=1&') && firstPages.push(r.url()));
+    await page.goto('/r/programming');
+    expect((await feedTitles(page))[0]).toBe('January winner');
+    expect(firstPages).toEqual([]);
+  });
+});
+
+test.describe('Server-rendered comments', () => {
+  // Crawlers that don't run scripts still see the comments
+  const html = async (request, url) => (await request.get(url)).text();
+
+  test('threads include their first page of comments, nested', async ({ request }) => {
+    const page = await html(request, `/Thread/${FIXTURE.topPost.id}`);
+    expect(page).toMatch(/id="t1_\w+"/);
+    expect(page).toContain('<p>First top-level comment</p>');
+    expect(page).toContain('<p>Nested reply</p>');
+  });
+
+  test('so do posts no archive has', async ({ request }) => {
+    expect(await html(request, `/Thread/${FIXTURE.missingPost.id}`)).toContain('<p>Comment on a post no archive has</p>');
+  });
+
+  test('threads whose comments are not loaded say so', async ({ request }) => {
+    expect(await html(request, `/Thread/${FIXTURE.laterPost.id}`)).toMatch(/Comments aren(&#x27;|')t archived yet/);
+  });
+
+  test('the browser fetches comments only for another sort', async ({ page }) => {
+    const fetched = [];
+    page.on('request', (r) => r.url().includes('/api/Comments') && fetched.push(new URL(r.url()).searchParams.get('sort')));
+    await page.goto(`/Thread/${FIXTURE.topPost.id}`);
+    const comments = page.getByRole('region', { name: 'Comments' });
+    await expect(comments.getByText('First top-level comment')).toBeVisible();
+    expect(fetched).toEqual([]);
+    await comments.getByRole('combobox').selectOption('new');
+    await expect(comments.locator('[id^="t1_"]').first()).toContainText('Late comment from January');
+    await comments.getByRole('combobox').selectOption('top');
+    await expect(comments.locator('[id^="t1_"]').first()).toContainText('First top-level comment');
+    expect(fetched).toEqual(['new', 'top']);
+  });
+});
+
 test.describe('Community history', () => {
   test('chart shows posts per month and a bar opens that month', async ({ page }) => {
     await page.goto('/r/programming');
@@ -348,6 +444,170 @@ test.describe('Theme', () => {
     await page.reload();
     await expect(html).toHaveAttribute('data-theme', next);
   });
+});
+
+// Checked in the server's HTML, before any script runs, as a crawler first sees it
+test.describe('Analytics', () => {
+  test('pages load the tracker, which only reports from the live site', async ({ request }) => {
+    const html = await (await request.get('/')).text();
+    const tag = /<script[^>]*src="\/stats\/script\.js"[^>]*>/.exec(html)?.[0];
+    expect(tag).toContain('data-website-id=');
+    expect(tag).toContain('data-domains="redditrebuilt.com"');
+  });
+
+  test('missing pages and communities work without the tracker', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto('/no/such/page');
+    await expect(page.getByText("we couldn't find that page")).toBeVisible();
+    await page.goto('/r/NoSuchCommunityAtAll');
+    await expect(page.getByText('There are no archived posts for r/NoSuchCommunityAtAll')).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe('Embedded media', () => {
+  const card = (id, title, url, extra = {}) => ({
+    id, title, url, subreddit: 'pics', author: 'alice', domain: new URL(url).hostname,
+    score: 1, num_comments: 0, created_utc: 1134000000, is_self: false, ...extra,
+  });
+  const feedOf = (page, posts) => page.route('**/api/Posts?*', (route) => route.fulfill({ json: posts }));
+  // Players stay offline: their pages are replaced with empty documents
+  const stubPlayers = (page) =>
+    page.route(/^https:\/\/(www\.redgifs\.com|clips\.twitch\.tv|open\.spotify\.com)\//, (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>player</title>' })
+    );
+
+  test('NSFW media can be shown unblurred for the session; spoilers still wait', async ({ page }) => {
+    await stubPlayers(page);
+    await feedOf(page, [
+      card('zz1', 'NSFW clip', 'https://www.redgifs.com/watch/FixtureClip', { over_18: true }),
+      card('zz2', 'NSFW spoiler clip', 'https://www.redgifs.com/watch/OtherClip', { over_18: true, spoiler: true }),
+    ]);
+    const players = page.locator('iframe[src^="https://www.redgifs.com/ifr/"]');
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(2);
+    // Nothing loads behind the blur
+    await expect(players).toHaveCount(0);
+
+    const toggle = page.getByRole('button', { name: 'Show NSFW media without blur for this session' });
+    await toggle.click();
+    await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'View spoiler' })).toHaveCount(1);
+    await expect(players).toHaveCount(1);
+
+    // The rest of the session, across reloads
+    await page.reload();
+    await expect(players).toHaveCount(1);
+    await page.getByRole('button', { name: 'Blur NSFW media again' }).click();
+    await expect(page.getByRole('button', { name: 'View NSFW content' })).toHaveCount(2);
+    await expect(players).toHaveCount(0);
+  });
+
+  test('a RedGIFs clip appears without a click', async ({ page }) => {
+    await stubPlayers(page);
+    await feedOf(page, [card('zz1', 'A clip', 'https://www.redgifs.com/watch/FixtureClip')]);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Play video' })).toHaveCount(0);
+    await expect(page.locator('iframe[title="A clip"]')).toHaveAttribute('src', 'https://www.redgifs.com/ifr/fixtureclip');
+  });
+
+  test('a Twitch clip names this site as its parent', async ({ page }) => {
+    await stubPlayers(page);
+    await feedOf(page, [card('zz1', 'A clip', 'https://clips.twitch.tv/FunnyClip-abc')]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Play video' }).click();
+    await expect(page.locator('iframe[title="A clip"]')).toHaveAttribute(
+      'src', 'https://clips.twitch.tv/embed?clip=FunnyClip-abc&parent=127.0.0.1'
+    );
+  });
+
+  test('Spotify shows its player straight away', async ({ page }) => {
+    await stubPlayers(page);
+    await feedOf(page, [card('zz1', 'A song', 'https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC')]);
+    await page.goto('/');
+    await expect(page.locator('iframe[title="A song"]')).toHaveAttribute('src', 'https://open.spotify.com/embed/track/4uLU6hMCjMI75M1A2tKUQC');
+  });
+
+  test('a Reddit video that is gone says so', async ({ page }) => {
+    const fetchedBy = [];
+    await page.route('https://v.redd.it/**', (route) => {
+      fetchedBy.push(route.request().resourceType());
+      return route.fulfill({ status: 403, body: '' });
+    });
+    await feedOf(page, [card('zz1', 'A video', 'https://v.redd.it/gonevideo1')]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Play video' }).click();
+    await expect(page.getByText('Video no longer available')).toBeVisible();
+    // Through hls.js, not Chrome's own HLS player, which fails on Reddit's streams
+    expect(fetchedBy).not.toContain('media');
+    expect(fetchedBy.length).toBeGreaterThan(0);
+    await expect(page.getByRole('link', { name: 'Original link' })).toHaveAttribute('href', 'https://v.redd.it/gonevideo1');
+  });
+});
+
+test.describe('Search engine markup', () => {
+  const canonical = (html) => /<link rel="canonical" href="([^"]+)"/.exec(html)?.[1];
+  // The origin is SITE_URL as built; the path is what matters
+  const path = (url) => new URL(url).pathname;
+
+  test('every page type names its canonical URL', async ({ request }) => {
+    const pages = {
+      '/?sort=new&from=2006-01': '/',
+      '/r/programming?sort=controversial': '/r/programming',
+      '/User/alice?sort=top': '/User/alice',
+      [`/Thread/${FIXTURE.selfPost.id}`]: `/Thread/${FIXTURE.selfPost.id}`,
+    };
+    for (const [url, expected] of Object.entries(pages)) {
+      expect(path(canonical(await (await request.get(url)).text())), url).toBe(expected);
+    }
+  });
+
+  test('every page type has a description search engines will show', async ({ request }) => {
+    const entities = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#x27;': "'" };
+    const description = (html) =>
+      /<meta name="description" content="([^"]*)"/.exec(html)?.[1].replace(/&(amp|lt|gt|quot|#x27);/g, (e) => entities[e]);
+    const pages = ['/', '/r/programming', '/User/alice', `/Thread/${FIXTURE.selfPost.id}`, `/Thread/${FIXTURE.topPost.id}`];
+    for (const url of pages) {
+      const text = description(await (await request.get(url)).text());
+      expect(text?.length, url).toBeGreaterThanOrEqual(70);
+      expect(text.length, url).toBeLessThanOrEqual(160);
+    }
+    const thread = description(await (await request.get(`/Thread/${FIXTURE.topPost.id}`)).text());
+    expect(thread).toContain('Posted in r/reddit.com by u/alice');
+  });
+
+  test('threads carry DiscussionForumPosting data', async ({ request }) => {
+    const html = await (await request.get(`/Thread/${FIXTURE.selfPost.id}`)).text();
+    const json = /<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/s.exec(html)?.[1];
+    const data = JSON.parse(json);
+    expect(data['@type']).toBe('DiscussionForumPosting');
+    expect(data.headline).toBe(FIXTURE.selfPost.title);
+    expect(path(data.url)).toBe(`/Thread/${FIXTURE.selfPost.id}`);
+    expect(data.text).toContain('bold');
+    expect(path(data.isPartOf.url)).toBe('/r/programming');
+    expect(data.interactionStatistic.map((s) => s.interactionType)).toEqual([
+      'https://schema.org/LikeAction', 'https://schema.org/CommentAction',
+    ]);
+    // The title's "<" is escaped, so post text can't end the script element
+    expect(json).not.toContain('<markdown>');
+  });
+
+  test('threads carry their first comments, nested', async ({ request }) => {
+    const html = await (await request.get(`/Thread/${FIXTURE.topPost.id}`)).text();
+    const data = JSON.parse(/<script type="application\/ld\+json"[^>]*>(.*?)<\/script>/s.exec(html)[1]);
+    const texts = (comments) => (comments || []).flatMap((c) => [c.text, ...texts(c.comment)]);
+    expect(texts(data.comment)).toEqual(expect.arrayContaining(['First top-level comment', 'Nested reply']));
+    const first = data.comment.find((c) => c.text === 'First top-level comment');
+    expect(first['@type']).toBe('Comment');
+    expect(first.comment.map((c) => c.text)).toContain('Reply from OP');
+    expect(texts(first.comment)).toContain('Nested reply');
+  });
+});
+
+test("users' profile communities open even with a dash in the name", async ({ request }) => {
+  expect((await request.get('/r/u_some-user')).status()).toBe(200);
+  expect((await request.get('/r/some-community')).status()).toBe(404);
 });
 
 test('unknown pages are a 404', async ({ page }) => {

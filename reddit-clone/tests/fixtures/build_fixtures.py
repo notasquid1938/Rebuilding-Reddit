@@ -104,12 +104,18 @@ COMMENTS = {
     # Comments arrive in later months' dumps too
     '2006-01': [
         comment('m001', 't3_b001', 'Late comment from January', 'erin', 30, ts(2006, 1, 2)),
+        # On a post no dump has (c0zz lies inside January's id range)
+        comment('m101', 't3_c0zz', 'Comment on a post no archive has', 'kate', 7, ts(2006, 1, 8),
+                link_id='t3_c0zz', subreddit='programming'),
+        comment('m102', 't1_m101', 'Reply under the missing post', 'liam', 3, ts(2006, 1, 8, 1),
+                link_id='t3_c0zz', subreddit='programming'),
     ],
 }
 
 # Miniature of the 2015 Internet Archive corpus for gapfill_loader.py: two posts
 # the monthly dumps already have, recovered posts (one in a month with no table
-# yet), a duplicate, an excluded community and lines that can't be used.
+# yet), a duplicate, a community Reddit banned for its content and lines that
+# can't be used.
 GAPFILL_CORPUS = [
     SUBMISSIONS['2005-12'][0],
     SUBMISSIONS['2006-01'][0],
@@ -120,7 +126,7 @@ GAPFILL_CORPUS = [
     post('c0aa', 'Post from a community banned later', 'BannedIn2015', 'gina', 64, '1136505600.0'),
     post('c0aa', 'Post from a community banned later', 'BannedIn2015', 'gina', 64, '1136505600.0'),
     post('d0aa', 'Another banned community post', 'BannedIn2015', 'gina', 32, ts(2006, 2, 4)),
-    post('jb01', 'Excluded community post', 'jailbait', 'mallory', 10, ts(2006, 1, 7)),
+    post('jb01', 'Post from a community banned for its content', 'BannedForContent', 'mallory', 10, ts(2006, 1, 7)),
     post('f0aa', 'Post from a month without a table', 'reddit.com', 'frank', 5, ts(2007, 3, 1)),
 ]
 GAPFILL_BAD_LINES = ['{oops', '{"title": "no id"}']
@@ -130,7 +136,7 @@ SCRAPE_2013 = {
     '2006-01': [
         SUBMISSIONS['2006-01'][0],  # already archived
         post('c0bb', 'Recovered by the 2013 scrape', 'reddit.com', 'harry', 77, ts(2006, 1, 9)),
-        post('jb02', 'Excluded community post', 'jailbait', 'mallory', 10, ts(2006, 1, 9)),
+        post('jb02', 'Post from a community banned for its content', 'BannedForContent', 'mallory', 10, ts(2006, 1, 9)),
     ],
 }
 # ...an archiver data zip (links.csv per day, no subreddit column: it comes from the path)...

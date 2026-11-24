@@ -78,6 +78,41 @@ export function useTheme() {
   return [theme, toggle];
 }
 
+// --- NSFW media: unblurred for the rest of the browser session once the reader
+// turns it on (sessionStorage, so a new session starts blurred again) ---
+const NSFW_KEY = 'showNsfw';
+const nsfwListeners = new Set();
+let showNsfwValue = null;
+
+function readShowNsfw() {
+  if (showNsfwValue === null) {
+    try {
+      showNsfwValue = sessionStorage.getItem(NSFW_KEY) === '1';
+    } catch {
+      showNsfwValue = false;
+    }
+  }
+  return showNsfwValue;
+}
+
+export function setShowNsfw(show) {
+  showNsfwValue = show;
+  try {
+    if (show) sessionStorage.setItem(NSFW_KEY, '1');
+    else sessionStorage.removeItem(NSFW_KEY);
+  } catch {}
+  nsfwListeners.forEach((l) => l());
+}
+
+const subscribeNsfw = (listener) => {
+  nsfwListeners.add(listener);
+  return () => nsfwListeners.delete(listener);
+};
+
+export function useShowNsfw() {
+  return useSyncExternalStore(subscribeNsfw, readShowNsfw, () => false);
+}
+
 // --- Saved posts (localStorage; no accounts, so they stay in this browser) ---
 const SAVED_KEY = 'savedPosts';
 const SAVED_LIMIT = 1000;

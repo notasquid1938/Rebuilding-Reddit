@@ -1,6 +1,7 @@
 // Server-side helpers for querying the monthly rs_YYYY_MM / rc_YYYY_MM tables.
 // Never import this file from client components.
 import connectToDatabase from '@/db';
+import { queryCache } from '@/lib/cache';
 
 const TABLE_CACHE_MS = 5 * 60 * 1000;
 const tableCache = {};
@@ -87,7 +88,9 @@ const COMMENT_ORDER = {
 
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 export const isMonth = (value) => typeof value === 'string' && MONTH_RE.test(value);
-export const SUBREDDIT_RE = /^[A-Za-z0-9_.]{1,64}$/;
+// Community names, plus the profile communities Reddit gives each user
+// (u_<username>), which keep any dashes in the username
+export const SUBREDDIT_RE = /^(?:[A-Za-z0-9_.]{1,64}|u_[A-Za-z0-9_-]{1,64})$/;
 export const AUTHOR_RE = /^[A-Za-z0-9_-]{1,64}$/;
 export const ID_RE = /^[a-z0-9]{1,16}$/i;
 
@@ -144,17 +147,64 @@ export function normalizeComment(row) {
   };
 }
 
+// A query holds a lock on every month table and index it reads until it
+// ends, and Postgres' shared lock table has room for about 6,400. A query over
+// every month takes ~1,400, so a handful at once (crawlers walking user pages)
+// fill it and every other query fails with "out of shared memory", the
+// loader's included. Queries over many months therefore run at most
+// WIDE_QUERY_LIMIT at a time, without parallel workers (which lock the same
+// tables again); the rest wait briefly, then get a BusyError.
+export const WIDE_TABLES = 32;
+const WIDE_QUERY_LIMIT = 2;
+const WIDE_QUERY_WAIT_MS = 15000;
+let wideRunning = 0;
+const wideQueue = [];
+
+export class BusyError extends Error {}
+
+function acquireWide() {
+  if (wideRunning < WIDE_QUERY_LIMIT) {
+    wideRunning++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve, reject) => {
+    const waiter = { resolve };
+    waiter.timer = setTimeout(() => {
+      wideQueue.splice(wideQueue.indexOf(waiter), 1);
+      reject(new BusyError('Too many wide queries'));
+    }, WIDE_QUERY_WAIT_MS);
+    wideQueue.push(waiter);
+  });
+}
+
+function releaseWide() {
+  const next = wideQueue.shift();
+  if (next) {
+    clearTimeout(next.timer);
+    next.resolve(); // the slot passes straight to the next waiter
+  } else {
+    wideRunning--;
+  }
+}
+
 // Run a query with a per-statement timeout so one expensive request can't
-// pin a pool connection indefinitely.
-export async function timedQuery(text, params, timeoutMs = 20000) {
-  const db = await connectToDatabase();
-  const client = await db.connect();
+// pin a pool connection indefinitely. `wide` marks queries over many months.
+export async function timedQuery(text, params, timeoutMs = 20000, { wide = false } = {}) {
+  if (wide) await acquireWide();
   try {
-    await client.query(`SET statement_timeout = ${Math.floor(timeoutMs)}`);
-    return await client.query(text, params);
+    const db = await connectToDatabase();
+    const client = await db.connect();
+    try {
+      await client.query(`SET statement_timeout = ${Math.floor(timeoutMs)}`);
+      if (wide) await client.query('SET max_parallel_workers_per_gather = 0');
+      return await client.query(text, params);
+    } finally {
+      await client.query('RESET statement_timeout').catch(() => {});
+      if (wide) await client.query('RESET max_parallel_workers_per_gather').catch(() => {});
+      client.release();
+    }
   } finally {
-    await client.query('RESET statement_timeout').catch(() => {});
-    client.release();
+    if (wide) releaseWide();
   }
 }
 
@@ -191,6 +241,40 @@ async function subredditMonths(subreddit) {
     [subreddit]
   );
   return new Set(rows.map((r) => r.month));
+}
+
+// Whether a one-off build (scripts/site_tables.sql) has finished
+const builds = new Map();
+async function isBuilt(name) {
+  const cached = builds.get(name);
+  if (cached && Date.now() - cached.time < TABLE_CACHE_MS) return cached.built;
+  let built = false;
+  if (await hasTable('site_builds')) {
+    const db = await connectToDatabase();
+    const { rows } = await db.query('SELECT 1 FROM site_builds WHERE name = $1', [name]);
+    built = rows.length > 0;
+  }
+  builds.set(name, { time: Date.now(), built });
+  return built;
+}
+
+// author_months numbers months from 2005-01 (month_number() in site_tables.sql)
+export const monthFromNumber = (n) => `${2005 + Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, '0')}`;
+
+// Months in which an author posted (from author_months), so user pages only
+// touch those tables; null until author_months has been built for every month.
+async function authorMonths(author) {
+  if (!(await isBuilt('author_months'))) return null;
+  const db = await connectToDatabase();
+  const { rows } = await db.query('SELECT months FROM author_months WHERE author = $1', [author]);
+  return new Set((rows[0]?.months || []).map(monthFromNumber));
+}
+
+// The monthly tables to search for an author's posts
+async function authorTables(author, months) {
+  const tables = (await getSubmissionTables()).filter((t) => t.columns.has('author'));
+  if (months === undefined) months = await authorMonths(author);
+  return months ? tables.filter((t) => months.has(t.month)) : tables;
 }
 
 const TOP_POSTS_PER_MONTH = 1000;
@@ -303,9 +387,18 @@ async function postsByIds(entries) {
   return entries.map((e) => found.get(e.id)).filter(Boolean);
 }
 
-export async function queryPosts({ startDate, endDate, subreddit, author, sort = 'top', limit = 25, offset = 0 }) {
-  const allTables = await getSubmissionTables();
-  let tables = author ? allTables : tablesInRange(allTables, startDate, endDate);
+// Results are cached in memory (lib/cache.js) for as long as the data can't
+// change in a way that matters: the loader adds a month at most daily
+const HOUR = 60 * 60 * 1000;
+
+export function queryPosts({ startDate, endDate, subreddit, author, sort = 'top', limit = 25, offset = 0 }) {
+  const args = { startDate, endDate, subreddit, author, sort, limit, offset };
+  const key = `posts:${[startDate, endDate, subreddit, author, sort, limit, offset].join('|')}`;
+  return queryCache.cached(key, HOUR, () => loadPosts(args));
+}
+
+async function loadPosts({ startDate, endDate, subreddit, author, sort, limit, offset }) {
+  let tables = author ? await authorTables(author) : tablesInRange(await getSubmissionTables(), startDate, endDate);
   if (subreddit && !author) {
     const months = await subredditMonths(subreddit);
     if (months) tables = tables.filter((t) => months.has(t.month));
@@ -353,8 +446,22 @@ export async function queryPosts({ startDate, endDate, subreddit, author, sort =
   const orderBy = LIVE_ORDER[sort] || LIVE_ORDER.top;
   params.push(limit, offset);
   const text = `SELECT * FROM (${branches.join(' UNION ALL ')}) AS posts${clause} ORDER BY ${orderBy} LIMIT $${params.length - 1} OFFSET $${params.length}`;
-  const { rows } = await timedQuery(text, params);
+  const { rows } = await timedQuery(text, params, 20000, { wide: branches.length > WIDE_TABLES });
   return rows.map(normalizePost);
+}
+
+const FIRST_PAGE_WAIT_MS = 2000;
+
+// The first page of a feed for a page's server render, so crawlers see posts
+// without running the page's scripts. null if it takes longer than the wait:
+// the browser then fetches it as before, and the query keeps going to fill
+// the cache for that request.
+export async function firstFeedPage(query, limit) {
+  const posts = await Promise.race([
+    queryPosts({ ...query, limit, offset: 0 }).catch(() => null),
+    new Promise((resolve) => setTimeout(resolve, FIRST_PAGE_WAIT_MS, null)),
+  ]);
+  return posts && { key: JSON.stringify(query), posts: [...posts], truncated: Boolean(posts.truncated) };
 }
 
 // Reddit ids are sequential base-36 numbers, so post_id_ranges narrows a
@@ -375,7 +482,12 @@ async function tablesForId(tables, id) {
   return tables.filter((t) => names.has(t.name) || !summarised.has(t.name));
 }
 
-export async function getPostById(id) {
+// Missing ids are remembered briefly, so a newly loaded month's posts show up soon
+export function getPostById(id) {
+  return queryCache.cached(`post:${id}`, (post) => (post ? 24 * HOUR : 10 * 60 * 1000), () => loadPostById(id));
+}
+
+async function loadPostById(id) {
   const tables = await tablesForId(await getSubmissionTables(), id);
   const branches = tables
     .filter((t) => t.columns.has('id'))
@@ -393,12 +505,76 @@ function addMonths(month, count) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+// A thread whose post no dump has but whose comments were archived: its id,
+// month and community, read from one of the comments. null if no comment
+// mentions it either.
+export function getMissingPost(id) {
+  return queryCache.cached(`missing:${id}`, (post) => (post ? 24 * HOUR : 10 * 60 * 1000), () => loadMissingPost(id));
+}
+
+async function loadMissingPost(id) {
+  const month = await monthOfId(id);
+  if (!month) return null;
+  const tables = (await commentTablesForMonth(month)).filter((t) => t.columns.has('link_id'));
+  if (tables.length === 0) return null;
+  // Months in order: the first comment found ends the search
+  const branches = tables.map(
+    (t) => `(SELECT ${t.columns.has('subreddit') ? '"subreddit"::text' : 'NULL::text'} AS subreddit
+               FROM "${t.name}" WHERE link_id = $1 LIMIT 1)`
+  );
+  const { rows } = await timedQuery(`${branches.join(' UNION ALL ')} LIMIT 1`, [`t3_${id}`], 10000);
+  if (!rows[0]) return null;
+  return { id, month, subreddit: nullish(rows[0].subreddit) ? null : rows[0].subreddit, missing: true };
+}
+
+// The month an id was handed out in. A few posts carry ids far from their
+// month's, which widens that month's range, so the narrowest range holding
+// the id is the right one.
+async function monthOfId(id) {
+  if (!(await hasTable('post_id_ranges'))) return null;
+  const value = parseInt(id, 36);
+  if (!Number.isSafeInteger(value)) return null;
+  const db = await connectToDatabase();
+  const { rows } = await db.query(
+    `SELECT to_char(month, 'YYYY-MM') AS month FROM post_id_ranges
+      WHERE $1::bigint BETWEEN id_min AND id_max ORDER BY id_max - id_min LIMIT 1`,
+    [value]
+  );
+  return rows[0]?.month || null;
+}
+
+// Comments recovered from other archives (wayback_threads.py), which can
+// belong to any month
+async function getExtraCommentTable() {
+  const cached = tableCache.rc_extra;
+  if (cached && Date.now() - cached.time < TABLE_CACHE_MS) return cached.table;
+  const db = await connectToDatabase();
+  const { rows } = await db.query(
+    `SELECT array_agg(a.attname::text) AS columns FROM pg_attribute a
+      WHERE a.attrelid = to_regclass('public.rc_extra') AND a.attnum > 0 AND NOT a.attisdropped`
+  );
+  const table = rows[0]?.columns ? { name: 'rc_extra', month: null, columns: new Set(rows[0].columns) } : null;
+  tableCache.rc_extra = { time: Date.now(), table };
+  return table;
+}
+
 // Reddit archives threads after six months, so a post's comments live in its
-// own month's table or one of the following six.
+// own month's table or one of the following six, plus any recovered ones.
+// Months whose comments aren't loaded yet stay without tables.
 export async function commentTablesForMonth(month) {
-  const tables = await getCommentTables();
-  if (!isMonth(month)) return tables;
-  return tablesInRange(tables, month, addMonths(month, 6));
+  const all = await getCommentTables();
+  const tables = isMonth(month) ? tablesInRange(all, month, addMonths(month, 6)) : all;
+  const extra = tables.length ? await getExtraCommentTable() : null;
+  return extra ? [...tables, extra] : tables;
+}
+
+// The first page of a thread's comments as /api/Comments returns it with the
+// default sort (and from the same cache entry)
+export async function firstComments(post, limit = 20) {
+  const tables = await commentTablesForMonth(post.month);
+  if (tables.length === 0) return { available: false, comments: [] };
+  const comments = await fetchCommentTree(tables, [`t3_${post.id}`], { depth: 4, limit, offset: 0, sort: 'top' });
+  return { available: true, comments };
 }
 
 async function fetchChildren(tables, parentIds) {
@@ -413,7 +589,12 @@ async function fetchChildren(tables, parentIds) {
 
 // Fetch comments below `rootFullnames` (t3_ or t1_ ids) down to `depth` levels.
 // Nodes at the bottom get `more: true` when they have unloaded children.
-export async function fetchCommentTree(tables, rootFullnames, { depth = 4, limit, offset = 0, sort = 'top' } = {}) {
+export function fetchCommentTree(tables, rootFullnames, { depth = 4, limit, offset = 0, sort = 'top' } = {}) {
+  const key = `comments:${tables.map((t) => t.name).join(',')}|${rootFullnames.join(',')}|${depth}|${limit}|${offset}|${sort}`;
+  return queryCache.cached(key, HOUR, () => loadCommentTree(tables, rootFullnames, { depth, limit, offset, sort }));
+}
+
+async function loadCommentTree(tables, rootFullnames, { depth, limit, offset, sort }) {
   const order = COMMENT_ORDER[sort] || COMMENT_ORDER.top;
   let roots;
   if (limit) {
@@ -460,7 +641,11 @@ const toMonth = (date) => (date ? new Date(date).toISOString().slice(0, 7) : nul
 
 // Archive stats (subreddits_metadata) merged with the community's about page
 // (subreddit_about, from the Arctic Shift subreddit snapshots).
-export async function getSubredditInfo(name) {
+export function getSubredditInfo(name) {
+  return queryCache.cached(`community:${name}`, HOUR, () => loadSubredditInfo(name));
+}
+
+async function loadSubredditInfo(name) {
   const [hasMeta, hasAbout, hasMonthly] = await Promise.all([
     hasTable('subreddits_metadata'),
     hasTable('subreddit_about'),
@@ -603,25 +788,42 @@ async function queryTopCommunities(startDate, endDate, limit) {
   return rows.map((row) => ({ name: row.subreddit, posts: Number(row.posts) }));
 }
 
-export async function getUserStats(author) {
-  const tables = (await getSubmissionTables()).filter((t) => t.columns.has('author'));
-  if (tables.length === 0) return null;
-  const branches = tables.map((t) => `SELECT score, created_utc FROM "${t.name}" WHERE author = $1`);
-  const { rows } = await timedQuery(
-    `SELECT COUNT(*) AS posts, COALESCE(SUM(score), 0) AS karma,
-            MIN(created_utc) AS first_post, MAX(created_utc) AS last_post
-       FROM (${branches.join(' UNION ALL ')}) AS posts`,
-    [author],
-    20000
-  );
-  const row = rows[0];
+export function getUserStats(author) {
+  return queryCache.cached(`user:${author}`, 6 * HOUR, () => loadUserStats(author));
+}
+
+// A user's first and latest post dates and, once author_months is built, how
+// many months they posted in. Totals such as post count or karma would read
+// every post from the archive disk, so they are left out.
+async function loadUserStats(author) {
+  const months = await authorMonths(author);
+  const tables = await authorTables(author, months);
+  const lastPost = await edgePostDate(tables, author, 'max');
   return {
     name: author,
-    posts: Number(row.posts),
-    karma: Number(row.karma),
-    firstPost: row.first_post ? Number(row.first_post) : null,
-    lastPost: row.last_post ? Number(row.last_post) : null,
+    firstPost: lastPost === null ? null : await edgePostDate(tables, author, 'min'),
+    lastPost,
+    activeMonths: months ? months.size : null,
   };
+}
+
+const DATE_SEARCH_MONTHS = 12;
+
+// The latest ('max') or first ('min') post date among `tables`, searching a
+// year of months at a time from that end and stopping at the first with a
+// post. Each month answers from its (author, created_utc) index, which reads
+// at most one post per month that has some.
+async function edgePostDate(tables, author, fn) {
+  const ordered = [...tables].sort((a, b) => a.month.localeCompare(b.month));
+  if (fn === 'max') ordered.reverse();
+  for (let i = 0; i < ordered.length; i += DATE_SEARCH_MONTHS) {
+    const branches = ordered
+      .slice(i, i + DATE_SEARCH_MONTHS)
+      .map((t) => `SELECT ${fn}(created_utc) AS at FROM "${t.name}" WHERE author = $1`);
+    const { rows } = await timedQuery(`SELECT ${fn}(at) AS at FROM (${branches.join(' UNION ALL ')}) AS months`, [author]);
+    if (rows[0].at !== null) return Number(rows[0].at);
+  }
+  return null;
 }
 
 // A random thread: from the front page, one of a month's top posts (top_posts,

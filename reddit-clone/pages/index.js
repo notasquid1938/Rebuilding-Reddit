@@ -5,7 +5,7 @@ import Feed from '@/components/Feed';
 import FeedControls from '@/components/FeedControls';
 import { PostSkeleton } from '@/components/PostCard';
 import { AboutArchiveCard, TopCommunitiesCard, SidebarFooter } from '@/components/Sidebar';
-import { DEFAULT_RANGE, SITE_NAME } from '@/lib/site';
+import { DEFAULT_RANGE, SITE_NAME, SITE_URL } from '@/lib/site';
 import { monthLabel } from '@/lib/format';
 import { rangeFromQuery, rangeToQuery } from '@/lib/range';
 import { FEED_SORTS, sortFromQuery, withSort } from '@/lib/sorts';
@@ -32,6 +32,7 @@ function HomePage() {
         <meta name="description" content="A website for archiving and exploring old Reddit posts from 2005 onwards" />
         <meta property="og:title" content={SITE_NAME} />
         <meta property="og:description" content="Browse the top Reddit posts of any month since 2005." />
+        <link rel="canonical" href={`${SITE_URL}/`} />
       </Head>
 
       <FeedControls

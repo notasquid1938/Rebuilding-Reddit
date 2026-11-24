@@ -45,7 +45,9 @@ The loader keeps the archive complete without supervision. Each cycle (every `RE
    - a chunk that fails is bisected, so only the bad rows are skipped;
    - indexes are built, the table is made crash-safe (`SET LOGGED`), then swapped in atomically, so the site never shows a half-loaded month;
    - completed files are recorded in `loader_state`, so an interrupted run resumes where it stopped. Several months load in parallel.
-3. **Fill gaps** (`gapfill_loader.py`, once): adds posts that the monthly dumps lack from the [Full Reddit Submission Corpus (2006 thru August 2015)](https://archive.org/details/FullRedditSubmissionCorpus2006ThruAugust2015), Jason Baumgartner's original 2014–15 crawl (42.7 GB, ~200 million posts). Pushshift later re-collected those years after some communities had been banned, so the monthly dumps cut, for example, the communities banned in 2015 off at the end of 2013. The corpus is downloaded in the background and checked against its published SHA-256; then only posts whose id isn't archived in any month are added. They're kept in `rs_extra` and merged into their months, and merged again if a month is ever reloaded. Communities banned for sexualising minors or for non-consensual images (`GAPFILL_EXCLUDE`) are never added. A report of what was recovered is written to `Data/supplements/RS_full_corpus.report.json`. `python3 gapfill_loader.py check` is a dry run that only counts what would be recovered (`RS_full_corpus.check.json`).
+3. **Fill gaps** (`gapfill_loader.py`, once): adds posts that the monthly dumps lack from the [Full Reddit Submission Corpus (2006 thru August 2015)](https://archive.org/details/FullRedditSubmissionCorpus2006ThruAugust2015), Jason Baumgartner's original 2014–15 crawl (42.7 GB, ~200 million posts). Pushshift later re-collected those years after some communities had been banned, so the monthly dumps cut, for example, the communities banned in 2015 off at the end of 2013. The corpus is downloaded in the background and checked against its published SHA-256; then only posts whose id isn't archived in any month are added. They're kept in `rs_extra` and merged into their months, and merged again if a month is ever reloaded. A report of what was recovered is written to `Data/supplements/RS_full_corpus.report.json`. `python3 gapfill_loader.py check` is a dry run that only counts what would be recovered (`RS_full_corpus.check.json`).
+   - **Saved thread pages** (`wayback_threads.py`, run by hand): for the communities named on its command line, lists the thread pages the Wayback Machine saved and fetches each one whose post no dump has, newest copy first. Old Reddit's pages mark every post and comment with its id, author, time and score, so the post goes into `rs_extra` and its comments into `rc_extra`; comments a comment month already has are skipped. It recovers communities banned before Pushshift collected them, such as r/fatpeoplehate's 2014–15 posts. Progress is kept per post, so a rerun only fetches what it hasn't tried. Run it in a one-off container from the loader image, e.g. `docker compose run --rm --no-deps loader python3 -u wayback_threads.py fatpeoplehate`.
+   - A thread whose post no archive has but whose comments were archived still opens, as "This post wasn't archived" with its comments.
 4. **Refresh lookup tables** (`scripts/site_tables.sql`, `scripts/build_subreddit_metadata.sql`): per-month id ranges, post counts per subreddit and month, each month's top 1000 posts, and the subreddit search index. With these, a thread lookup touches one month instead of hundreds, community feeds skip months where the community had no posts, and unfiltered "Top" pages read a small table.
 5. **Subreddits** (`subreddits_loader.py`): loads the about page of every subreddit (title, description, sidebar, members, creation date, icon and banner URLs) from Arctic Shift's subreddit snapshots (2024-01 and 2025-01, about 22 million communities; `u_` profile subreddits are skipped). Newer snapshots win, but a value that later disappeared, such as the icon of a since-banned community, keeps its last known version.
 6. **Icons** (`scrape_icons.py`): downloads each community's icon into `Data/reddit/icons/`, starting with the communities that have the most posts. It is **append-only**: an icon already on disk is never replaced or removed, so a community deleted from Reddit keeps the icon scraped while it existed. Failed downloads are retried after 30 days.
@@ -87,8 +89,18 @@ Directories next to `reddit-clone/`:
 | --- | --- |
 | `Data/` | Downloaded `.zst` dumps, subreddit snapshots (`Data/subreddits/`), the gap-fill corpus (`Data/supplements/`) and icons (`Data/reddit/icons/`) |
 | `pg_archive/` | Postgres tablespace for loaded months. Point this volume at your largest disk in `docker-compose.yml` |
+| `pg_fast/` | Optional SSD tablespace (`fast_ssd`) for the most-read indexes |
 
-The Postgres data volume itself (Docker volume `postgres_data`) holds the small lookup tables and any months loaded before the tablespace existed.
+The Postgres data directory itself (Docker volume `postgres_data`) holds the site tables, the small lookup tables and any months loaded before the tablespace existed.
+
+To put these on other disks, set paths in `reddit-clone/.env` (not tracked):
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `POSTGRES_DATA` | `postgres_data` (Docker volume) | Postgres data directory |
+| `PG_FAST_DIR` | `../pg_fast` | Directory behind the `fast_ssd` tablespace |
+| `LOADER_QUIET_HOURS` | (none) | Local hours the loader leaves the disks alone, e.g. `23-8`. Loads pause between chunks, and long steps (indexing a month, refreshing its lookup rows, building `author_months`) only start if they can finish first. The website keeps serving |
+| `LOADER_TZ` | `UTC` | Time zone of `LOADER_QUIET_HOURS`, e.g. `America/Chicago` |
 
 ### Configuration
 
@@ -105,7 +117,6 @@ Set these on the `loader` service in `docker-compose.yml`:
 | `LOADER_COMMENTS_WORKERS` | `2` | Comment months loaded in parallel (each saturates a hard disk more than a post month; overrides `LOADER_WORKERS`) |
 | `LOADER_TABLESPACE` | `archive_hdd` | Tablespace for loaded months (created on the `pg_archive` volume) |
 | `GAPFILL` | `1` | `0` skips the 2006–2015 gap-fill corpus |
-| `GAPFILL_EXCLUDE` | `jailbait,preteen_girls,creepshots,thefappening,beatingwomen` | Communities the gap-fill never adds (comma list, replaces the default) |
 | `REFRESH_HOURS` | `24` | How often to check for newly published months |
 | `ICON_RATE` | `20` | Icon downloads per second |
 
@@ -116,6 +127,43 @@ And on the `reddit-clone` (website) service:
 | `POSTGRES_URL` | `postgres://postgres:postgres@db:5432/Reddit-Rebuilt` | Database connection |
 | `DATA_DIR` | `/Data` | Where icons (`reddit/icons/`) and archived Imgur images (`imgur/images/`) are read from |
 | `SITE_URL` | `https://redditrebuilt.com` | Absolute URLs in the sitemap and canonical links |
+| `QUERY_CACHE_MB` | `256` | Memory for cached feeds, threads, comments and user stats (`0` turns the cache off). Nothing is written to disk |
+
+### Analytics
+
+`analytics/docker-compose.yml` runs two dashboards, separate from the site:
+
+- **Umami** (port 3002): visitors, pages, referrers, countries and devices, from a cookie-free script in every page. It doesn't see crawlers. Custom events: `page-not-found` (with the path) and `community-not-archived` (with the community name).
+- **GoAccess** (port 3004): a report rebuilt every 10 minutes from the reverse proxy's access log, which includes crawlers, bandwidth and error responses. IPs are anonymised.
+
+```bash
+cd analytics
+printf 'UMAMI_DB_PASSWORD=%s\nUMAMI_APP_SECRET=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 32)" > .env
+docker compose up -d
+```
+
+Then log in to Umami (`admin` / `umami`), change the password, add the site, and put its website ID in `reddit-clone/lib/analytics.js`. The tracker only reports from the domains listed there.
+
+The reverse proxy has to serve `/stats/script.js` and `/stats/api/send` on the site from Umami, and write a JSON access log that the `goaccess` service reads. With Caddy:
+
+```
+redditrebuilt.com {
+	log {
+		output file /var/log/caddy/redditrebuilt.log {
+			roll_size 50MiB
+			roll_keep_for 720h
+		}
+	}
+	@analytics path /stats/script.js /stats/api/send
+	handle @analytics {
+		uri strip_prefix /stats
+		reverse_proxy 127.0.0.1:3002
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3001
+	}
+}
+```
 
 ## Database layout
 
@@ -124,10 +172,15 @@ And on the `reddit-clone` (website) service:
 | `rs_YYYY_MM` | Submissions for one month. Indexed by `id`, `(subreddit, score)`, `(author, created_utc)` and `score` |
 | `rc_YYYY_MM` | Comments for one month. Indexed by `parent_id` and `link_id` |
 | `loader_state` | Every dump file loaded, with row and skipped-row counts |
-| `rs_extra` | Posts recovered by the gap-fill, with their month; merged into `rs_YYYY_MM` |
+| `rs_extra` | Posts recovered by the gap-fill, the supplements and `wayback_threads.py`, with their month and source; merged into `rs_YYYY_MM` |
+| `rc_extra` | Comments recovered from saved thread pages (`wayback_threads.py`); the website reads it with the comment months |
+| `wayback_threads` | Each post `wayback_threads.py` tried, and whether a saved copy could be used |
 | `post_id_ranges` | Base-36 id range of each month, for thread lookups |
 | `subreddit_monthly` | Posts per subreddit per month |
 | `top_posts` | Top 1000 posts of each month |
+| `feed_rollup` | Each community's (and the front page's) leading posts per month for every sort |
+| `author_months` | The months each author posted in, so user pages read only those months. Built once by `build_author_months()` (~20 GB for the full archive; up to ~40 GB of staging on the archive disk while it runs), then kept current as months load |
+| `site_builds` | One-off builds that have finished (the website uses `author_months` only once it's listed here) |
 | `subreddits_metadata` | Per-subreddit totals and first/last active month (search, community stats) |
 | `subreddit_about` | About pages: title, descriptions, members, creation date, icon/banner URLs |
 | `icon_fetch_attempts` | Icon download results, so dead URLs aren't retried every cycle |
