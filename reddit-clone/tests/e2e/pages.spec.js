@@ -15,6 +15,12 @@ test.describe('Home', () => {
     expect(titles.slice(0, 3)).toEqual([FIXTURE.topPost.title, 'January winner', FIXTURE.selfPost.title]);
   });
 
+  test('the header has no source-code link', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /Switch to (dark|light) mode/ })).toBeVisible();
+    await expect(page.locator('header a[href*="github.com"]')).toHaveCount(0);
+  });
+
   test('infinite scroll reaches the end of the feed', async ({ page }) => {
     await page.goto('/');
     const end = page.getByText("You've reached the end of this feed.");
