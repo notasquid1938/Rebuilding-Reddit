@@ -83,22 +83,6 @@
   display: none;
 }
 
-.headerPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 14px;
-  border-radius: var(--radius-pill);
-  background: var(--bg-secondary);
-  color: var(--text-strong);
-  font-weight: 600;
-}
-
-.headerPill:hover {
-  background: var(--bg-secondary-hover);
-}
-
 /* ---------- Search ---------- */
 .search {
   position: relative;
@@ -405,15 +389,8 @@
     padding: 0 8px;
   }
 
-  .logoText,
-  .headerPill span {
+  .logoText {
     display: none;
-  }
-
-  .headerPill {
-    width: 40px;
-    padding: 0;
-    justify-content: center;
   }
 
   .contentArea {

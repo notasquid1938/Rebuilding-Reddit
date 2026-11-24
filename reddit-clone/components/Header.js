@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import SearchBar from './SearchBar';
-import { MenuIcon, MoonIcon, SunIcon, CodeIcon, EyeIcon, EyeOffIcon } from './Icons';
+import { MenuIcon, MoonIcon, SunIcon, EyeIcon, EyeOffIcon } from './Icons';
 import { setShowNsfw, useShowNsfw, useTheme } from '@/lib/hooks';
 import styles from '@/styles/Layout.module.css';
 
@@ -56,15 +56,6 @@ const Header = ({ onToggleNav }) => {
         >
           {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
         </button>
-        <a
-          className={styles.headerPill}
-          href="https://github.com/notasquid1938/Rebuilding-Reddit"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <CodeIcon size={18} />
-          <span>Source</span>
-        </a>
       </div>
     </header>
   );
