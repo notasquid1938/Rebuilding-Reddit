@@ -24,10 +24,13 @@ const feedQueryFor = (name, query) => {
 };
 
 // Search engines show 70-160 characters, so a short community blurb is
-// followed by what the archive holds
-function communityDescription(name, blurb) {
+// followed by what the archive holds. A community Reddit no longer shows is
+// only readable here, so its description leads with that
+function communityDescription(name, blurb, unavailable) {
   const archive = `Top posts from r/${name} in any month of Reddit's history, archived with their comments on ${SITE_NAME}.`;
-  const text = (blurb || '').replace(/\s+/g, ' ').trim();
+  const text = unavailable
+    ? `Archive of r/${name}, which has been banned or made private on Reddit. ${archive}`
+    : (blurb || '').replace(/\s+/g, ' ').trim();
   return (text.length >= 70 ? text : [text, archive].filter(Boolean).join(' · ')).slice(0, 160);
 }
 
@@ -126,8 +129,11 @@ function CommunityPage({ name, info, firstPage }) {
       }
     >
       <Head>
-        <title>{`r/${name} - ${SITE_NAME}`}</title>
-        <meta name="description" content={communityDescription(name, info?.about?.publicDescription)} />
+        <title>{info?.about?.unavailable ? `r/${name} archive - ${SITE_NAME}` : `r/${name} - ${SITE_NAME}`}</title>
+        <meta
+          name="description"
+          content={communityDescription(name, info?.about?.publicDescription, info?.about?.unavailable)}
+        />
         <meta property="og:title" content={`r/${name}`} />
         <link rel="canonical" href={`${SITE_URL}/r/${encodeURIComponent(name)}`} />
       </Head>

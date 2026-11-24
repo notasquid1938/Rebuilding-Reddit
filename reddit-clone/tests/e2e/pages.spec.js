@@ -21,6 +21,19 @@ test.describe('Home', () => {
     await expect(page.locator('header a[href*="github.com"]')).toHaveCount(0);
   });
 
+  test('opens a pasted Reddit link at its archived copy', async ({ page }) => {
+    await page.goto('/');
+    const box = page.getByRole('textbox', { name: 'Reddit link' });
+    await box.fill('https://example.com/not-reddit');
+    await page.getByRole('button', { name: 'Open', exact: true }).click();
+    await expect(page.getByText("That isn't a link to a Reddit thread, community or user.")).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open in Reddit Rebuilt' })).toHaveAttribute('href', /^javascript:/);
+    await box.fill(`https://old.reddit.com/r/reddit.com/comments/${FIXTURE.topPost.id}/top_best_post/`);
+    await page.getByRole('button', { name: 'Open', exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`/Thread/${FIXTURE.topPost.id}$`));
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(FIXTURE.topPost.title);
+  });
+
   test('infinite scroll reaches the end of the feed', async ({ page }) => {
     await page.goto('/');
     const end = page.getByText("You've reached the end of this feed.");
@@ -105,6 +118,17 @@ test.describe('Home', () => {
 });
 
 test.describe('Thread', () => {
+  test('a thread from a banned community says so; one with no text or comments stays out of search', async ({ page }) => {
+    await page.goto('/Thread/c002');
+    await expect(page.getByText('r/science has been banned or made private on Reddit')).toBeVisible();
+    await expect(page.locator('meta[name="robots"][content="noindex"]')).toHaveCount(1);
+
+    await page.goto(`/Thread/${FIXTURE.topPost.id}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(FIXTURE.topPost.title);
+    await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
+    await expect(page.getByText('has been banned or made private on Reddit')).toHaveCount(0);
+  });
+
   test('renders a self post with markdown', async ({ page }) => {
     await page.goto(`/Thread/${FIXTURE.selfPost.id}`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(FIXTURE.selfPost.title);
@@ -238,6 +262,11 @@ test.describe('Community', () => {
   test('canonicalises the name', async ({ page }) => {
     await page.goto('/r/PROGRAMMING');
     await expect(page).toHaveURL(/\/r\/programming$/);
+  });
+
+  test('a banned community is titled as an archive', async ({ page }) => {
+    await page.goto('/r/science');
+    await expect(page).toHaveTitle('r/science archive - Reddit Rebuilt');
   });
 
   test('banned community notice', async ({ page }) => {

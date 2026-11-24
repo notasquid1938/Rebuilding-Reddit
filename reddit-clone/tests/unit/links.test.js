@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkTarget } from '@/lib/links';
+import { archivedPath, linkTarget } from '@/lib/links';
 
 describe('linkTarget', () => {
   it('points Reddit threads, communities and users at their archived copies', () => {
@@ -34,5 +34,36 @@ describe('linkTarget', () => {
     expect(linkTarget('you have a g3 flat, use g3 mags')).toBeNull();
     expect(linkTarget('www.example.com')).toBeNull();
     expect(linkTarget('')).toBeNull();
+  });
+});
+
+describe('archivedPath', () => {
+  it('finds the archived thread for any form of Reddit thread link', () => {
+    for (const link of [
+      'https://www.reddit.com/r/AskReddit/comments/ABC12/what_is/',
+      'https://old.reddit.com/r/AskReddit/comments/abc12/what_is/def34/?context=3',
+      'reddit.com/r/AskReddit/comments/abc12',
+      'https://np.reddit.com/comments/abc12',
+      'https://redd.it/abc12',
+      'redd.it/abc12',
+      'https://redditrebuilt.com/Thread/abc12',
+      '  https://m.reddit.com/r/AskReddit/comments/abc12/what_is/?utm_source=share  ',
+    ]) {
+      expect(archivedPath(link), link).toBe('/Thread/abc12');
+    }
+  });
+
+  it('finds communities and users', () => {
+    expect(archivedPath('https://www.reddit.com/r/pics/')).toBe('/r/pics');
+    expect(archivedPath('https://www.reddit.com/r/pics/top/?t=all')).toBe('/r/pics');
+    expect(archivedPath('https://www.reddit.com/user/spez/submitted/')).toBe('/User/spez');
+    expect(archivedPath('reddit.com/u/spez')).toBe('/User/spez');
+  });
+
+  it('refuses links only Reddit can resolve and anything that is not Reddit', () => {
+    expect(archivedPath('https://www.reddit.com/r/pics/s/aBcDeF123')).toBe(null);
+    expect(archivedPath('https://notreddit.com/r/pics/comments/abc12')).toBe(null);
+    expect(archivedPath('https://example.com')).toBe(null);
+    expect(archivedPath('')).toBe(null);
   });
 });

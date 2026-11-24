@@ -15,6 +15,38 @@ import { SITEMAP_BATCH_SIZE } from '@/lib/site';
 
 export const SITEMAPS_PER_INDEX = 45000;
 
+// Pages only this site has, listed ahead of the monthly batches: communities
+// Reddit has banned or made private (subreddit_about recorded only their
+// name) with at least UNAVAILABLE_MIN_POSTS archived posts, and threads whose
+// comments were recovered from the Wayback Machine (wayback_threads.py)
+export const SPECIAL_SITEMAPS = ['unavailable-communities', 'recovered-threads'];
+export const UNAVAILABLE_MIN_POSTS = 20;
+
+// Paths in one of SPECIAL_SITEMAPS, most posts or comments first
+export async function specialSitemapPaths(name) {
+  if (name === 'unavailable-communities') {
+    if (!(await hasTable('subreddit_about')) || !(await hasTable('subreddits_metadata'))) return [];
+    const { rows } = await timedQuery(
+      `SELECT m.name FROM subreddit_about a JOIN subreddits_metadata m ON lower(m.name) = lower(a.name)
+        WHERE a.title IS NULL AND a.subscribers IS NULL AND m.post_count >= $1
+        ORDER BY m.post_count DESC LIMIT 50000`,
+      [UNAVAILABLE_MIN_POSTS],
+      30000
+    );
+    return [...new Set(rows.map((r) => `/r/${encodeURIComponent(r.name)}`))];
+  }
+  if (name === 'recovered-threads') {
+    if (!(await hasTable('wayback_threads'))) return [];
+    const { rows } = await timedQuery(
+      `SELECT post_id FROM wayback_threads WHERE status = 'recovered' ORDER BY comments DESC NULLS LAST LIMIT 50000`,
+      [],
+      30000
+    );
+    return rows.map((r) => `/Thread/${encodeURIComponent(r.post_id)}`);
+  }
+  return null;
+}
+
 // table -> { min, max, start }: start is where numbered batches begin
 async function idRanges() {
   if (!(await hasTable('post_id_ranges'))) return new Map();
@@ -33,7 +65,7 @@ async function idRanges() {
   );
 }
 
-// Every batch name, oldest month first
+// Every batch name: SPECIAL_SITEMAPS, then the months, oldest first
 export async function sitemapBatches() {
   const tables = await getSubmissionTables();
   const ranges = await idRanges();
@@ -46,7 +78,7 @@ export async function sitemapBatches() {
   );
   const estimates = new Map(rows.map((row) => [row.relname, Number(row.estimate)]));
 
-  const batches = [];
+  const batches = [...SPECIAL_SITEMAPS];
   for (const table of tables) {
     const range = ranges.get(table.name);
     const size = range ? range.max - range.start + 1 : estimates.get(table.name) || 0;

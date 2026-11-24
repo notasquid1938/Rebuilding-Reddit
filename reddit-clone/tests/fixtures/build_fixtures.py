@@ -172,6 +172,8 @@ SUBREDDIT_SNAPSHOTS = {
          'subreddit_type': 'public', 'retrieved_on': ts(2024, 1, 5)},
         {'display_name': 'u_alice', 'title': 'Profile subreddit', 'subscribers': 1},
         {'display_name': 'GoneSub', 'id': 'goneid', 'title': None, 'subscribers': None},
+        # Banned with archived posts: listed in the unavailable-communities sitemap
+        {'display_name': 'science', 'id': 'sciid', 'title': None, 'subscribers': None},
     ],
     # Newer snapshot: updated counts, icon since removed (must keep the old one)
     'subreddits_2025-01.zst': [

@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Layout from '@/components/Layout';
 import Feed from '@/components/Feed';
 import FeedControls from '@/components/FeedControls';
+import OpenRedditLink from '@/components/OpenRedditLink';
 import { PostSkeleton } from '@/components/PostCard';
 import { AboutArchiveCard, TopCommunitiesCard, SidebarFooter } from '@/components/Sidebar';
 import { DEFAULT_RANGE, SITE_NAME, SITE_URL } from '@/lib/site';
@@ -35,6 +36,7 @@ function HomePage() {
         <link rel="canonical" href={`${SITE_URL}/`} />
       </Head>
 
+      <OpenRedditLink />
       <FeedControls
         sort={sort}
         sorts={FEED_SORTS}

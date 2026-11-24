@@ -1,0 +1,87 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-card);
+  background: var(--bg-sidebar-card);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.text,
+.hint,
+.error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-weak);
+}
+
+.error {
+  color: var(--upvote);
+}
+
+.form {
+  display: flex;
+  gap: 8px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+  color: var(--text-strong);
+  font: inherit;
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+.button {
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--button-primary);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--button-primary-hover);
+}
+
+.bookmarklet {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-secondary);
+  color: var(--text-strong);
+  font-weight: 600;
+  cursor: grab;
+}
+
+/* Touch screens have no bookmarks bar to drag to */
+@media (hover: none) {
+  .hint {
+    display: none;
+  }
+}

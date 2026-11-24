@@ -321,6 +321,24 @@ test.describe('Sitemaps', () => {
     expect(xml.match(/<url>/g)).toHaveLength(45);
   });
 
+  test('pages only this site has come first', async ({ request }) => {
+    const index = await (await request.get('/sitemap.xml')).text();
+    const first = index.indexOf('/Sitemap/unavailable-communities<');
+    expect(first).toBeGreaterThan(-1);
+    expect(index.indexOf('/Sitemap/recovered-threads<')).toBeGreaterThan(first);
+    expect(index.indexOf('/Sitemap/2005_12-1<')).toBeGreaterThan(first);
+
+    const communities = await (await request.get('/Sitemap/unavailable-communities')).text();
+    expect(communities).toContain('/r/science</loc>');
+    expect(communities).not.toContain('/r/programming</loc>');
+    // GoneSub was banned before any of its posts were archived
+    expect(communities).not.toContain('GoneSub');
+
+    const recovered = await request.get('/Sitemap/recovered-threads');
+    expect(recovered.status()).toBe(200);
+    expect(await recovered.text()).toContain('<urlset');
+  });
+
   test('batches and index pages past the end are 404s', async ({ request }) => {
     expect((await request.get('/Sitemap/2005_12-2')).status()).toBe(404);
     expect((await request.get('/Sitemap/1999_01-1')).status()).toBe(404);
@@ -344,6 +362,15 @@ test.describe('Sitemaps', () => {
     }
     expect(text).not.toContain('OAI-SearchBot');
     expect(text).toMatch(/User-agent: \*\nAllow: \//);
+  });
+
+  test('/open sends a Reddit link to its archived copy', async ({ request }) => {
+    const open = (url) => request.get(`/open?url=${encodeURIComponent(url)}`, { maxRedirects: 0 });
+    expect((await open('https://redd.it/B001')).headers().location).toBe('/Thread/b001');
+    expect((await open('https://www.reddit.com/user/alice/comments/')).headers().location).toBe('/User/alice');
+    const notReddit = await open('https://example.com/');
+    expect(notReddit.status()).toBe(200);
+    expect(await notReddit.text()).toContain('noindex');
   });
 
   test('serves the IndexNow key as plain text', async ({ request }) => {

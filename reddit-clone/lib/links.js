@@ -27,3 +27,25 @@ export function linkTarget(href) {
   if (href.startsWith('#') || SCHEME_RE.test(href)) return { href };
   return null;
 }
+
+// The archived copy of a link someone pasted: a thread, community or user on
+// any Reddit host (with or without "https://"), a redd.it short link, or a
+// link to this site. null for anything else, such as a Reddit app share link
+// (/r/name/s/...), which only Reddit can resolve
+export function archivedPath(input) {
+  const text = String(input || '').trim();
+  const short = /^(?:https?:\/\/)?(?:www\.)?redd\.it\/([a-z0-9]+)\/?(?:[?#].*)?$/i.exec(text);
+  if (short) return `/Thread/${short[1].toLowerCase()}`;
+  const host = /^(?:https?:\/\/)?(?:(?:www|old|new|np|m|sh)\.)?(?:reddit|redditrebuilt)\.com(?=[/?#]|$)/i.exec(text);
+  if (!host && !text.startsWith('/')) return null;
+  const path = text.slice(host ? host[0].length : 0).replace(/[?#].*$/, '');
+  const m = /^\/(?:r\/[^/]+\/)?comments\/([a-z0-9]+)/i.exec(path);
+  if (m) return `/Thread/${m[1].toLowerCase()}`;
+  const thread = /^\/Thread\/([a-z0-9]+)\/?$/i.exec(path);
+  if (thread) return `/Thread/${thread[1].toLowerCase()}`;
+  const user = /^\/(?:u|user|User)\/([A-Za-z0-9_-]+)(?:\/[^/]*)?\/?$/.exec(path);
+  if (user) return `/User/${user[1]}`;
+  if (/^\/r\/[^/]+\/s\//.test(path)) return null;
+  const community = /^\/r\/(u_[A-Za-z0-9_-]+|[A-Za-z0-9_.]+)(?:\/|$)/.exec(path);
+  return community ? `/r/${community[1]}` : null;
+}

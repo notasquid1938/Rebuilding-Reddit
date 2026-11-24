@@ -38,8 +38,13 @@ export async function getServerSideProps({ params, res }) {
     new Promise((resolve) => setTimeout(resolve, COMMENTS_WAIT_MS, null)),
   ]);
 
+  // A post with no text whose loaded comments months hold no comments is
+  // little more than a title; it stays out of search results so crawlers
+  // spend their time on threads worth finding
+  const thin = !post.missing && !hasBody(post) && Boolean(firstPage?.available) && firstPage.comments.length === 0;
+
   res.setHeader('Cache-Control', 'public, s-maxage=86400');
-  return { props: { post, firstPage, comments: commentStructuredData(firstPage?.comments) } };
+  return { props: { post, firstPage, thin, comments: commentStructuredData(firstPage?.comments) } };
 }
 
 function useCommunityInfo(name) {
@@ -59,6 +64,7 @@ function useCommunityInfo(name) {
 }
 
 const removedText = (text) => ['[deleted]', '[removed]'].includes(text);
+const hasBody = (post) => Boolean(post.is_self && post.selftext && !removedText(post.selftext));
 
 function useBack(subreddit) {
   const router = useRouter();
@@ -137,15 +143,14 @@ function MissingPostDetail({ post, firstPage }) {
   );
 }
 
-function PostDetail({ post, firstPage, comments }) {
+function PostDetail({ post, firstPage, thin, comments }) {
   if (post.missing) return <MissingPostDetail post={post} firstPage={firstPage} />;
-  return <ArchivedPostDetail post={post} firstPage={firstPage} comments={comments} />;
+  return <ArchivedPostDetail post={post} firstPage={firstPage} thin={thin} comments={comments} />;
 }
 
-function ArchivedPostDetail({ post, firstPage, comments }) {
+function ArchivedPostDetail({ post, firstPage, thin, comments }) {
   const info = useCommunityInfo(post.subreddit);
   const title = decodeEntities(post.title);
-  const hasBody = post.is_self && post.selftext && !removedText(post.selftext);
 
   useEffect(() => {
     if (post.subreddit) addRecentCommunity(post.subreddit);
@@ -154,7 +159,7 @@ function ArchivedPostDetail({ post, firstPage, comments }) {
   const goBack = useBack(post.subreddit);
 
   // Search engines show 70-160 characters, so a short body is followed by where it was posted
-  const body = hasBody ? decodeEntities(post.selftext).replace(/\s+/g, ' ').trim() : '';
+  const body = hasBody(post) ? decodeEntities(post.selftext).replace(/\s+/g, ' ').trim() : '';
   const commentCount = post.num_comments === 1 ? '1 comment' : `${post.num_comments || 0} comments`;
   const posted = `Posted in r/${post.subreddit} by u/${post.author} on ${fullDate(post.created_utc)}, with ${commentCount}, archived on ${SITE_NAME}`;
   const description = (body.length >= 70 ? body : [body, posted].filter(Boolean).join(' · ')).slice(0, 160);
@@ -178,6 +183,7 @@ function ArchivedPostDetail({ post, firstPage, comments }) {
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
         <meta property="og:site_name" content={SITE_NAME} />
+        {thin && <meta name="robots" content="noindex" />}
         {post.over_18 && <meta name="rating" content="adult" />}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd(threadStructuredData(post, comments)) }} />
       </Head>
@@ -225,7 +231,14 @@ function ArchivedPostDetail({ post, firstPage, comments }) {
           <LinkThumbnail post={post} />
         </div>
 
-        {hasBody && <Markdown className={styles.body}>{post.selftext}</Markdown>}
+        {info?.about?.unavailable && (
+          <p className={styles.preservedNote}>
+            r/{post.subreddit} has been banned or made private on Reddit, so this thread is no longer there. This is the
+            archived copy.
+          </p>
+        )}
+
+        {hasBody(post) && <Markdown className={styles.body}>{post.selftext}</Markdown>}
         {post.is_self && removedText(post.selftext) && <p className={styles.removed}>{post.selftext}</p>}
 
         <PostMedia post={post} />

@@ -95,6 +95,15 @@ a.author:hover {
   font-style: italic;
 }
 
+.preservedNote {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
 .archivedNote {
   margin: 12px 0 0;
   font-size: 12px;
