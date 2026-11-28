@@ -119,7 +119,10 @@ def normalize(record, subreddit=None):
     if month_of(post.get('created_utc')) is None:
         return None
     if 'url' in post and 'domain' not in post:
-        post['domain'] = urllib.parse.urlsplit(str(post['url'])).hostname or None
+        try:
+            post['domain'] = urllib.parse.urlsplit(str(post['url'])).hostname or None
+        except ValueError:  # e.g. "http://[broken"; keep the post without a domain
+            pass
     return post
 
 

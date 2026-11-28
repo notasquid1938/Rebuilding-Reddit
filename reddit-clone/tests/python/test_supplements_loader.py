@@ -21,6 +21,11 @@ def test_normalize_rejects_unusable_records():
     assert sl.normalize({'id': 'abc', 'title': 'x', 'created_utc': 'never'}) is None
 
 
+def test_normalize_keeps_a_post_whose_link_will_not_parse():
+    post = sl.normalize({'id': 'a1', 'title': 't', 'created_utc': 1136505600, 'url': 'http://[not-a-host/x'})
+    assert post['url'] == 'http://[not-a-host/x' and 'domain' not in post
+
+
 def test_normalize_uses_the_default_subreddit_last():
     assert sl.normalize({'id': 'a1', 'title': 't', 'created_utc': 1}, 'fromPath')['subreddit'] == 'fromPath'
     assert sl.normalize({'id': 'a1', 'title': 't', 'created_utc': 1, 'subreddit': 'own'}, 'fromPath')['subreddit'] == 'own'
