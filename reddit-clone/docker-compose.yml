@@ -106,8 +106,9 @@ services:
       # Comment months saturate the archive disk; with more at once, community
       # pages (random reads on the same disk) time out while they load
       - LOADER_COMMENTS_WORKERS=2
-      # Don't download comment months: the ones on disk already fill the space
-      - FETCH_COMMENTS=0
+      # Download comment months too; the free-space check above keeps them
+      # from filling the disk
+      - FETCH_COMMENTS=1
       # Delete RS/RC_*.zst after a load with zero skipped rows
       - DELETE_LOADED_DUMPS=submissions,comments
       # Fill 2006-2015 gaps once from the Internet Archive's 2015 corpus (42.7 GB download)
